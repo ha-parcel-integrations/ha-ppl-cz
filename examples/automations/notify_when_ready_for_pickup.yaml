@@ -1,0 +1,30 @@
+# Notify when a PPL CZ parcel is ready to collect at a Parcelshop / Parcelbox.
+#
+# PPL CZ delivers both to the doorstep and to pickup points (including
+# AlzaBox lockers) — the useful "come and get it" moment for the latter is
+# when a parcel reaches `at_pickup_point`. The pickup location name is on the
+# parcel's `pickup_point` attribute.
+
+alias: "PPL CZ: ready for pickup"
+description: Notify when a tracked PPL CZ parcel is ready to collect.
+mode: queued
+max: 10
+
+triggers:
+  - trigger: event
+    event_type: ppl_cz_parcel_status_changed
+
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.new_status == 'at_pickup_point' }}"
+
+actions:
+  - action: notify.mobile_app
+    data:
+      title: "PPL CZ ready for pickup"
+      message: >-
+        {{ trigger.event.data.barcode }} is ready to collect
+        {{ ('at ' ~ trigger.event.data.pickup_point)
+           if trigger.event.data.pickup_point else '' }}.
+      data:
+        clickAction: "{{ trigger.event.data.url }}"

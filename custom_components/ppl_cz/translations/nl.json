@@ -1,0 +1,130 @@
+{
+  "title": "PPL CZ",
+  "config": {
+    "step": {
+      "user": {
+        "title": "PPL CZ instellen",
+        "description": "Voer het e-mailadres van je mojePPL-account in. PPL CZ stuurt een pincode naar dat adres.",
+        "data": {
+          "email": "E-mailadres"
+        }
+      },
+      "code": {
+        "title": "Voer de pincode in",
+        "description": "Voer de pincode in die PPL CZ naar {email} heeft gestuurd.",
+        "data": {
+          "pin": "Pincode"
+        }
+      },
+      "reauth_confirm": {
+        "title": "PPL CZ-aanmelding verlopen",
+        "description": "PPL CZ accepteert de opgeslagen sessie voor {email} niet meer. Vraag een nieuwe pincode aan om opnieuw aan te melden."
+      }
+    },
+    "error": {
+      "invalid_pin": "Die pincode werd geweigerd — mogelijk onjuist of verlopen. Vraag een nieuwe aan.",
+      "invalid_auth": "PPL CZ heeft de aanmelding geweigerd.",
+      "cannot_connect": "Kan geen verbinding maken met PPL CZ. Probeer het opnieuw."
+    },
+    "abort": {
+      "already_configured": "Dat PPL CZ-account is al ingesteld.",
+      "reauth_successful": "PPL CZ is opnieuw geauthenticeerd.",
+      "wrong_account": "Die pincode hoort bij een ander PPL CZ-account. Meld je aan met het account waarvoor deze integratie is ingesteld."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PPL CZ-opties",
+        "sections": {
+          "delivered": {
+            "name": "Bezorgde pakketten",
+            "data": {
+              "delivered_filter_type": "Filter op",
+              "delivered_filter_amount": "Aantal"
+            },
+            "data_description": {
+              "delivered_filter_type": "Toon bezorgde pakketten van de laatste X dagen, of beperk tot de X meest recente.",
+              "delivered_filter_amount": "Aantal dagen of pakketten om te tonen."
+            }
+          },
+          "history": {
+            "name": "Pakketgeschiedenis",
+            "data": {
+              "include_history": "Statusgeschiedenis opnemen"
+            },
+            "data_description": {
+              "include_history": "Voeg per pakket een attribuut toe met elke statuswijziging (tijdstip, status, oorspronkelijke tekst). Kost één extra verzoek per pakket per verversing. Standaard uit."
+            }
+          },
+          "polling": {
+            "name": "Vernieuwen",
+            "data": {
+              "refresh_interval": "Ververs elke"
+            },
+            "data_description": {
+              "refresh_interval": "Hoe vaak de integratie PPL CZ controleert op pakketwijzigingen. Een langer interval is milder voor de API van PPL CZ; de standaard van 30 minuten volstaat voor de meeste pakketten."
+            }
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "refresh_interval": {
+      "options": {
+        "15": "15 minuten",
+        "30": "30 minuten",
+        "60": "60 minuten",
+        "120": "120 minuten",
+        "240": "240 minuten"
+      }
+    },
+    "delivered_filter_type": {
+      "options": {
+        "days": "Dagen",
+        "parcels": "Aantal pakketten"
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "parcel_registered": "Een pakket is geregistreerd",
+      "parcel_status_changed": "De status van een pakket is gewijzigd",
+      "parcel_delivered": "Een pakket is bezorgd",
+      "outgoing_parcel_status_changed": "De status van een verzonden pakket is gewijzigd",
+      "outgoing_parcel_delivered": "Een verzonden pakket is bezorgd"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Vernieuwen"
+      }
+    },
+    "sensor": {
+      "incoming_parcels": {
+        "name": "Inkomende pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "delivered_parcels": {
+        "name": "Bezorgde pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "outgoing_parcels": {
+        "name": "Uitgaande pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "outgoing_delivered_parcels": {
+        "name": "Uitgaande bezorgde pakketten",
+        "unit_of_measurement": "pakketten"
+      },
+      "last_update": {
+        "name": "Laatste geslaagde update"
+      },
+      "parcel": {
+        "name": "Pakket {barcode}"
+      }
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "title": "PPL CZ",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nastavit PPL CZ",
+        "description": "Zadejte e-mailovou adresu svého účtu mojePPL. PPL CZ na ni pošle PIN.",
+        "data": {
+          "email": "E-mailová adresa"
+        }
+      },
+      "code": {
+        "title": "Zadejte PIN",
+        "description": "Zadejte PIN, který PPL CZ zaslala na {email}.",
+        "data": {
+          "pin": "PIN"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Přihlášení k PPL CZ vypršelo",
+        "description": "PPL CZ již neakceptuje uloženou relaci pro {email}. Vyžádejte si nový PIN pro opětovné přihlášení."
+      }
+    },
+    "error": {
+      "invalid_pin": "Tento PIN byl odmítnut — může být nesprávný nebo vypršel. Vyžádejte si nový.",
+      "invalid_auth": "PPL CZ odmítla přihlášení.",
+      "cannot_connect": "Nepodařilo se spojit s PPL CZ. Zkuste to prosím znovu."
+    },
+    "abort": {
+      "already_configured": "Tento účet PPL CZ je již nastaven.",
+      "reauth_successful": "PPL CZ byla úspěšně znovu ověřena.",
+      "wrong_account": "Tento PIN patří k jinému účtu PPL CZ. Přihlaste se k účtu, pro který byla tato integrace nastavena."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Možnosti PPL CZ",
+        "sections": {
+          "delivered": {
+            "name": "Doručené zásilky",
+            "data": {
+              "delivered_filter_type": "Filtrovat podle",
+              "delivered_filter_amount": "Počet"
+            },
+            "data_description": {
+              "delivered_filter_type": "Zobrazit doručené zásilky za posledních X dní, nebo omezit na X nejnovějších.",
+              "delivered_filter_amount": "Počet dní nebo zásilek k zobrazení."
+            }
+          },
+          "history": {
+            "name": "Historie zásilky",
+            "data": {
+              "include_history": "Zahrnout historii stavů"
+            },
+            "data_description": {
+              "include_history": "Přidá u každé zásilky atribut s historií každé změny stavu (čas, stav, původní text). Stojí jeden extra požadavek na zásilku při každé aktualizaci. Ve výchozím nastavení vypnuto."
+            }
+          },
+          "polling": {
+            "name": "Aktualizace",
+            "data": {
+              "refresh_interval": "Aktualizovat každých"
+            },
+            "data_description": {
+              "refresh_interval": "Jak často integrace kontroluje PPL CZ ohledně změn zásilek. Delší interval je šetrnější k API PPL CZ; výchozích 30 minut stačí pro většinu zásilek."
+            }
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "refresh_interval": {
+      "options": {
+        "15": "15 minut",
+        "30": "30 minut",
+        "60": "60 minut",
+        "120": "120 minut",
+        "240": "240 minut"
+      }
+    },
+    "delivered_filter_type": {
+      "options": {
+        "days": "Dny",
+        "parcels": "Počet zásilek"
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "parcel_registered": "Zásilka byla zaregistrována",
+      "parcel_status_changed": "Stav zásilky se změnil",
+      "parcel_delivered": "Zásilka byla doručena",
+      "outgoing_parcel_status_changed": "Stav odeslané zásilky se změnil",
+      "outgoing_parcel_delivered": "Odeslaná zásilka byla doručena"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Aktualizovat"
+      }
+    },
+    "sensor": {
+      "incoming_parcels": {
+        "name": "Příchozí zásilky",
+        "unit_of_measurement": "zásilky"
+      },
+      "delivered_parcels": {
+        "name": "Doručené zásilky",
+        "unit_of_measurement": "zásilky"
+      },
+      "outgoing_parcels": {
+        "name": "Odchozí zásilky",
+        "unit_of_measurement": "zásilky"
+      },
+      "outgoing_delivered_parcels": {
+        "name": "Odchozí doručené zásilky",
+        "unit_of_measurement": "zásilky"
+      },
+      "last_update": {
+        "name": "Poslední úspěšná aktualizace"
+      },
+      "parcel": {
+        "name": "Zásilka {barcode}"
+      }
+    }
+  }
+}

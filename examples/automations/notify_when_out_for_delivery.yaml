@@ -1,0 +1,24 @@
+# Notify when a PPL CZ parcel goes out for delivery.
+
+alias: "PPL CZ: out for delivery"
+description: Notify when a tracked PPL CZ parcel is loaded for delivery today.
+mode: queued
+max: 10
+
+triggers:
+  - trigger: event
+    event_type: ppl_cz_parcel_status_changed
+
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.new_status == 'out_for_delivery' }}"
+
+actions:
+  - action: notify.mobile_app
+    data:
+      title: "PPL CZ on the way"
+      message: >-
+        {{ trigger.event.data.sender or trigger.event.data.barcode }}
+        is being delivered today.
+      data:
+        clickAction: "{{ trigger.event.data.url }}"

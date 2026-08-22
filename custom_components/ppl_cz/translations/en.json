@@ -1,0 +1,130 @@
+{
+  "title": "PPL CZ",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up PPL CZ",
+        "description": "Enter the e-mail address of your mojePPL account. PPL CZ will send a PIN to that address.",
+        "data": {
+          "email": "E-mail address"
+        }
+      },
+      "code": {
+        "title": "Enter the PIN",
+        "description": "Enter the PIN PPL CZ e-mailed to {email}.",
+        "data": {
+          "pin": "PIN"
+        }
+      },
+      "reauth_confirm": {
+        "title": "PPL CZ sign-in expired",
+        "description": "PPL CZ no longer accepts the stored session for {email}. Request a new PIN to sign in again."
+      }
+    },
+    "error": {
+      "invalid_pin": "That PIN was rejected — it may be wrong or expired. Request a new one.",
+      "invalid_auth": "PPL CZ rejected the sign-in.",
+      "cannot_connect": "Could not reach PPL CZ. Please try again."
+    },
+    "abort": {
+      "already_configured": "That PPL CZ account is already set up.",
+      "reauth_successful": "PPL CZ was reauthenticated successfully.",
+      "wrong_account": "That PIN is for a different PPL CZ account. Sign in with the account this entry was set up for."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PPL CZ options",
+        "sections": {
+          "delivered": {
+            "name": "Delivered parcels",
+            "data": {
+              "delivered_filter_type": "Filter by",
+              "delivered_filter_amount": "Amount"
+            },
+            "data_description": {
+              "delivered_filter_type": "Show delivered parcels from the last X days, or limit to the X most recent.",
+              "delivered_filter_amount": "Number of days or parcels to show."
+            }
+          },
+          "history": {
+            "name": "Parcel history",
+            "data": {
+              "include_history": "Include status history"
+            },
+            "data_description": {
+              "include_history": "Add a per-parcel history attribute listing each status update (timestamp, status, original text). Costs one extra request per parcel per refresh. Off by default."
+            }
+          },
+          "polling": {
+            "name": "Polling",
+            "data": {
+              "refresh_interval": "Refresh every"
+            },
+            "data_description": {
+              "refresh_interval": "How often the integration checks PPL CZ for parcel updates. A slower interval is gentler on PPL CZ's API; the default of 30 minutes is plenty for most parcels."
+            }
+          }
+        }
+      }
+    }
+  },
+  "selector": {
+    "refresh_interval": {
+      "options": {
+        "15": "15 minutes",
+        "30": "30 minutes",
+        "60": "60 minutes",
+        "120": "120 minutes",
+        "240": "240 minutes"
+      }
+    },
+    "delivered_filter_type": {
+      "options": {
+        "days": "Days",
+        "parcels": "Number of parcels"
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "parcel_registered": "A parcel was registered",
+      "parcel_status_changed": "A parcel's status changed",
+      "parcel_delivered": "A parcel was delivered",
+      "outgoing_parcel_status_changed": "A sent parcel's status changed",
+      "outgoing_parcel_delivered": "A sent parcel was delivered"
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "sensor": {
+      "incoming_parcels": {
+        "name": "Incoming parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "delivered_parcels": {
+        "name": "Delivered parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "outgoing_parcels": {
+        "name": "Outgoing parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "outgoing_delivered_parcels": {
+        "name": "Outgoing delivered parcels",
+        "unit_of_measurement": "parcels"
+      },
+      "last_update": {
+        "name": "Last successful update"
+      },
+      "parcel": {
+        "name": "Parcel {barcode}"
+      }
+    }
+  }
+}

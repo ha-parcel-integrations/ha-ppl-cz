@@ -235,6 +235,24 @@ async def test_refresh_rejected_raises_auth_error(status):
         await client.async_get_parcels()
 
 
+async def test_refresh_rejected_logs_azure_error_body(caplog):
+    body = {"error": "invalid_grant", "error_description": "AADB2C90080: expired"}
+    session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
+    client = PPLCZApiClient(session, refresh_token="rt")
+    with caplog.at_level("DEBUG"):
+        with pytest.raises(PPLCZAuthError):
+            await client.async_get_parcels()
+    assert "invalid_grant" in caplog.text
+    assert "AADB2C90080: expired" in caplog.text
+
+
+async def test_refresh_rejected_unparseable_body_does_not_mask_auth_error():
+    session = _Session({("post", AZURE_TOKEN_URL): [(400, ValueError("nope"))]})
+    client = PPLCZApiClient(session, refresh_token="rt")
+    with pytest.raises(PPLCZAuthError):
+        await client.async_get_parcels()
+
+
 async def test_refresh_outage_raises_api_error():
     session = _Session({("post", AZURE_TOKEN_URL): [(500, {})]})
     client = PPLCZApiClient(session, refresh_token="rt")

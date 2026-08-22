@@ -229,7 +229,15 @@ class PPLCZApiClient:
                 if response.status in (400, 401, 403):
                     # The refresh token itself lapsed (14 days idle on the one
                     # live sample) or was revoked — this is the real "log in
-                    # again" signal, not an access-token expiry.
+                    # again" signal, not an access-token expiry. Azure's own
+                    # error/error_description explain *why* (expired, reused,
+                    # revoked) and carry no user PII, so log them at DEBUG —
+                    # otherwise a rejected refresh is a bare status code.
+                    _LOGGER.debug(
+                        "PPL CZ token refresh rejected (HTTP %s): %s",
+                        response.status,
+                        await _azure_error(response),
+                    )
                     raise PPLCZAuthError(f"refresh HTTP {response.status}")
                 if response.status != 200:
                     raise PPLCZApiError(f"refresh HTTP {response.status}")
@@ -346,3 +354,16 @@ async def _json(response: aiohttp.ClientResponse) -> Any:
         return await response.json(content_type=None)
     except ValueError as err:
         raise PPLCZApiError(f"unparseable body ({err})") from err
+
+
+async def _azure_error(response: aiohttp.ClientResponse) -> str:
+    """Best-effort ``error``/``error_description`` out of a rejected Azure
+    B2C response, for the debug log — never raises, since this only runs on
+    a path that is already about to raise its own error."""
+    try:
+        body = await response.json(content_type=None)
+    except ValueError:
+        return "<unparseable body>"
+    if not isinstance(body, dict):
+        return "<non-object body>"
+    return f"{body.get('error')}: {body.get('error_description')}"

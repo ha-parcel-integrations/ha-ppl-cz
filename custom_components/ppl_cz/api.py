@@ -24,6 +24,7 @@ plain access-token expiry, is the actual "log in again" signal.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -101,6 +102,12 @@ class PPLCZApiClient:
         self._refresh_token = refresh_token
         self._token_expires_at = token_expires_at
         self._on_tokens_updated = on_tokens_updated
+        # Azure rotates the refresh token on every use (single-use). Without
+        # this, two callers racing _authed_request (e.g. the manual refresh
+        # button firing alongside the scheduled poll) can both see a stale
+        # token as "expiring soon" and both redeem it — the loser gets a 400
+        # and the integration wrongly treats a live account as logged out.
+        self._refresh_lock = asyncio.Lock()
 
     @property
     def access_token(self) -> str | None:
@@ -231,26 +238,48 @@ class PPLCZApiClient:
             raise PPLCZApiError(f"refresh network error ({err})") from err
         self._store_tokens(payload)
 
+    def _token_is_fresh(self) -> bool:
+        """Whether the access token exists and is outside the refresh margin."""
+        return (
+            self._access_token is not None
+            and self._token_expires_at is not None
+            and datetime.now(timezone.utc) < self._token_expires_at - _REFRESH_MARGIN
+        )
+
     async def _async_ensure_fresh_token(self) -> None:
         """Refresh proactively when the access token is missing or stale."""
-        if (
-            self._access_token is None
-            or self._token_expires_at is None
-            or datetime.now(timezone.utc) >= self._token_expires_at - _REFRESH_MARGIN
-        ):
-            await self._async_refresh()
+        if self._token_is_fresh():
+            return
+        async with self._refresh_lock:
+            # Re-check: a concurrent caller (e.g. the manual refresh button
+            # firing alongside the scheduled poll) may have already refreshed
+            # while we were waiting for the lock.
+            if not self._token_is_fresh():
+                await self._async_refresh()
+
+    async def _async_refresh_if_current(self, observed_access_token: str | None) -> None:
+        """Refresh unless a concurrent caller already rotated the token.
+
+        Guards the reactive 401 path the same way: without this, two
+        requests racing a 401 would both redeem the same (single-use, Azure
+        rotates it) refresh token and the loser would get a 400.
+        """
+        async with self._refresh_lock:
+            if self._access_token == observed_access_token:
+                await self._async_refresh()
 
     async def _authed_request(self, method: str, url: str) -> Any:
         """Issue an authenticated ``/mobapp`` request, retrying once on 401."""
         await self._async_ensure_fresh_token()
         for attempt in range(2):
+            access_token = self._access_token
             headers = {
                 DHL_API_KEY_HEADER: DHL_API_KEY,
-                "Authorization": f"Bearer {self._access_token}",
+                "Authorization": f"Bearer {access_token}",
             }
             async with self._session.request(method, url, headers=headers) as response:
                 if response.status == 401 and attempt == 0:
-                    await self._async_refresh()
+                    await self._async_refresh_if_current(access_token)
                     continue
                 if response.status == 401:
                     raise PPLCZAuthError("PPL CZ rejected the access token")

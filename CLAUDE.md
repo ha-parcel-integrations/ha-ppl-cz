@@ -63,6 +63,19 @@ refresh token itself lapsed or was revoked) raises `PPLCZAuthError` →
 `ConfigEntryAuthFailed` — a plain access-token expiry is invisible to the
 user, handled entirely inside the client.
 
+**Refresh is serialised behind `PPLCZApiClient._refresh_lock`.** Azure
+rotates the refresh token on every use (single-use), so two callers racing
+a stale token — the scheduled poll and a manually-pressed refresh button
+are the two paths that can genuinely overlap, since HA's coordinator does
+not mutually exclude its own interval timer against `async_request_refresh`
+— would otherwise both redeem the same token; the loser gets a 400 and the
+integration wrongly forces reauth on a perfectly live account. Both the
+proactive path (`_async_ensure_fresh_token`) and the reactive 401 retry
+(`_async_refresh_if_current`) acquire the lock and re-check the access
+token afterwards, so a caller that lost the race skips its own refresh
+instead of repeating it. Fixed 2026-08-22, reported in
+[issue #1](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/1).
+
 **The static `dhl-api-key` header is shipped deliberately.** It is
 hardcoded identically in every mojePPL install — normally the exact
 shared/extracted-secret class this suite's standing ruling refuses (bpost,

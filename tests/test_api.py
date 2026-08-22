@@ -1,4 +1,5 @@
 """Tests for the mojePPL account API client."""
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -191,6 +192,33 @@ async def test_refresh_rotates_the_refresh_token():
     )
     await client.async_get_parcels()
     assert client.refresh_token == REFRESH_GRANT_TOKENS["refresh_token"]
+
+
+async def test_concurrent_requests_share_a_single_refresh():
+    """Two callers racing a stale token (e.g. the refresh button firing
+    alongside the scheduled poll) must not both redeem the same refresh
+    token — Azure rotates it on use, so the loser would get a 400."""
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, REFRESH_GRANT_TOKENS)],
+            ("get", SHIPMENTS_URL): [
+                (200, shipments_envelope([])),
+                (200, shipments_envelope([])),
+            ],
+        }
+    )
+    client = PPLCZApiClient(
+        session,
+        access_token="stale",
+        refresh_token="old-refresh",
+        token_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+    )
+    results = await asyncio.gather(
+        client.async_get_parcels(), client.async_get_parcels()
+    )
+    assert results == [[], []]
+    assert client.refresh_token == REFRESH_GRANT_TOKENS["refresh_token"]
+    assert session.calls.count(("post", AZURE_TOKEN_URL)) == 1
 
 
 async def test_refresh_without_token_raises_auth_error():

@@ -7,8 +7,8 @@ shipment is captured) only has to change one place.
 """
 from __future__ import annotations
 
-INCOMING_CODE = "70106196515"
-OUTGOING_CODE = "40721942229"
+INCOMING_CODE = "10000000001"
+OUTGOING_CODE = "20000000002"
 
 # --- auth ---------------------------------------------------------------
 

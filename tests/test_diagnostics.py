@@ -15,11 +15,11 @@ async def test_diagnostics_redacts_and_counts(hass):
     }
     entry.options = {"refresh_interval": 30}
     parcel = {
-        "barcode": "70106196515",
+        "barcode": "10000000001",
         "status": "in_transit",
         "sender": "Example Shop",
         "pickup_point": "AlzaBox Central",
-        "url": "https://www.ppl.cz/vyhledat-zasilku?shipmentId=70106196515",
+        "url": "https://www.ppl.cz/vyhledat-zasilku?shipmentId=10000000001",
         "raw": {
             "ownership": "OWNER",
             "cod": 199.0,

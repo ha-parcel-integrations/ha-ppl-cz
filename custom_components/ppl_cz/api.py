@@ -86,6 +86,21 @@ class PPLCZInvalidPin(PPLCZApiError):
         super().__init__(detail)
 
 
+class _EmptyResponseError(PPLCZApiError):
+    """A ``200`` with a zero-byte body — seen after a laptop wakes from sleep.
+
+    A stale pooled connection can hand back a syntactically valid but empty
+    response instead of erroring outright. Callers retry once on this
+    specific signal rather than on any parse failure, since a non-empty but
+    malformed body is a real API-contract problem worth surfacing
+    immediately.
+    """
+
+    def __init__(self) -> None:
+        """No detail needed — the empty body is the whole story."""
+        super().__init__("empty response body")
+
+
 class PPLCZApiClient:
     """Client for the mojePPL account API."""
 
@@ -225,14 +240,23 @@ class PPLCZApiClient:
 
         Mirrors the app's own session model: there is no refresh call to
         fall back to (see the module docstring), only the stored
-        email/password.
+        email/password. Retries once on an empty response body — this is
+        the token endpoint, most likely to be hit right after a long idle
+        gap (e.g. the host waking from sleep) with a stale pooled
+        connection still in play.
         """
         if not self._email or not self._password:
             raise PPLCZAuthError("no stored PPL CZ credentials to re-authenticate with")
-        try:
-            await self.async_exchange_password(self._email, self._password)
-        except aiohttp.ClientError as err:
-            raise PPLCZApiError(f"re-mint network error ({err})") from err
+        for attempt in range(2):
+            try:
+                await self.async_exchange_password(self._email, self._password)
+                return
+            except _EmptyResponseError:
+                if attempt == 1:
+                    raise
+                _LOGGER.debug("PPL CZ token exchange got an empty body, retrying once")
+            except aiohttp.ClientError as err:
+                raise PPLCZApiError(f"re-mint network error ({err})") from err
 
     def _token_is_fresh(self) -> bool:
         """Whether the access token exists and is outside the refresh margin."""
@@ -281,7 +305,13 @@ class PPLCZApiClient:
                     raise PPLCZAuthError("PPL CZ rejected the access token")
                 if response.status != 200:
                     raise PPLCZApiError(f"HTTP {response.status}")
-                return await _json(response)
+                try:
+                    return await _json(response)
+                except _EmptyResponseError:
+                    if attempt == 1:
+                        raise
+                    _LOGGER.debug("PPL CZ %s got an empty body, retrying once", url)
+                    continue
         raise PPLCZAuthError("PPL CZ rejected the access token")
 
     # --- data ------------------------------------------------------------
@@ -337,7 +367,14 @@ def _parse_expires_in(value: Any) -> int:
 
 
 async def _json(response: aiohttp.ClientResponse) -> Any:
-    """Parse a JSON body, tolerating a non-JSON content type."""
+    """Parse a JSON body, tolerating a non-JSON content type.
+
+    A zero-byte body raises :class:`_EmptyResponseError` rather than the
+    generic parse error — see that class for why it gets its own retry.
+    """
+    raw = await response.read()
+    if not raw:
+        raise _EmptyResponseError
     try:
         return await response.json(content_type=None)
     except ValueError as err:

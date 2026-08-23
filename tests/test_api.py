@@ -32,11 +32,16 @@ from .payloads import (
 CONFIRM_URL = REGISTRATION_CONFIRM_URL.format(registration_session_id="reg-session-1")
 EVENTS_URL = SHIPMENT_EVENTS_URL.format(shipment_id="id-1")
 
+EMPTY_BODY = object()  # a 200 with a zero-byte body, the stale-connection symptom
+
 
 class _Resp:
     def __init__(self, status: int, body: object = None) -> None:
         self.status = status
         self._body = body
+
+    async def read(self) -> bytes:
+        return b"" if self._body is EMPTY_BODY else b"x"
 
     async def json(self, content_type=None):
         if isinstance(self._body, Exception):
@@ -272,6 +277,32 @@ async def test_remint_network_error_is_api_error():
         await client.async_get_parcels()
 
 
+async def test_remint_retries_once_on_empty_body():
+    """A stale pooled connection (e.g. after the host wakes from sleep) can
+    hand back a syntactically valid 200 with a zero-byte body instead of
+    erroring outright — worth one retry rather than treating it as an
+    auth rejection."""
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, EMPTY_BODY), (200, REMINTED_TOKENS)],
+            ("get", SHIPMENTS_URL): [(200, shipments_envelope([]))],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    await client.async_get_parcels()
+    assert client.access_token == REMINTED_TOKENS["access_token"]
+    assert session.calls.count(("post", AZURE_TOKEN_URL)) == 2
+
+
+async def test_remint_raises_after_two_empty_bodies():
+    session = _Session(
+        {("post", AZURE_TOKEN_URL): [(200, EMPTY_BODY), (200, EMPTY_BODY)]}
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    with pytest.raises(PPLCZApiError):
+        await client.async_get_parcels()
+
+
 # --- authed requests / retry-on-401 -----------------------------------------
 
 
@@ -304,6 +335,30 @@ async def test_authed_request_non_200_raises_api_error():
         {
             ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
             ("get", SHIPMENTS_URL): [(503, {})],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    with pytest.raises(PPLCZApiError):
+        await client.async_get_parcels()
+
+
+async def test_authed_request_retries_once_on_empty_body():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", SHIPMENTS_URL): [(200, EMPTY_BODY), (200, shipments_envelope([]))],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    assert await client.async_get_parcels() == []
+    assert session.calls.count(("get", SHIPMENTS_URL)) == 2
+
+
+async def test_authed_request_raises_after_two_empty_bodies():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", SHIPMENTS_URL): [(200, EMPTY_BODY), (200, EMPTY_BODY)],
         }
     )
     client = PPLCZApiClient(session, email="a@b.c", password="pw")

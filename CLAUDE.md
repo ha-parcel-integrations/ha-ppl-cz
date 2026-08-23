@@ -68,6 +68,19 @@ crash-loop. **`diagnostics.py` redacts `password`** — it is a real, reusable
 credential, not a token, and must never appear in a diagnostics dump pasted
 into a public issue.
 
+**A `200` with an empty body gets one silent retry, not a forced reauth
+(2026-08-23).** Observed live on the local dev instance: the token endpoint
+and the shipments GET both occasionally hand back a syntactically valid
+`200` with a zero-byte body — a stale pooled `aiohttp` connection surviving
+past a long idle gap (the host waking from sleep is the one case caught so
+far) rather than a real rejection. `_json()` raises the dedicated
+`_EmptyResponseError` for this specific case (not any unparseable body —
+malformed-but-nonempty JSON still surfaces immediately as a real
+API-contract problem); `_async_remint` and `_authed_request` each retry
+exactly once on it before giving up. Distinct from the `AADB2C90129`
+revocation this integration already handles — that one is a genuine
+password rejection and correctly still raises `PPLCZAuthError`.
+
 **Token storage: an absolute expiry timestamp, not the raw `expires_in`.**
 `api.py._store_tokens` computes `token_expires_at = now + expires_in` at
 fetch time and persists that (plus `access_token`) in the config entry —

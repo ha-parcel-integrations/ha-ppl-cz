@@ -49,9 +49,16 @@ CAPABILITIES = frozenset({"pickup_point", "url", "history"})
 #   1. POST registrations       {email, deviceId, registrationSessionId} -> 204
 #   2. PUT  registrations/{id}  {pin, deviceId} -> {password}  (a one-time
 #      Azure AD B2C password minted for this login)
-#   3. Azure B2C ROPC token exchange (grant_type=password) -> access/refresh token
+#   3. Azure B2C ROPC token exchange (grant_type=password) -> access token
 # Then GET /api/v2/me/shipments?shipment_type=ALL (Bearer + dhl-api-key) returns
 # both incoming and outgoing shipments in one call — no separate "sent" endpoint.
+#
+# Step 3 is also how a stale access token gets renewed — re-run the same
+# password grant with the stored PIN-exchange password, the same way the app
+# itself does. There is no refresh-token step: PPL's B2C tenant hard-revokes
+# the whole token lineage ~1h after the original login regardless of
+# intervening refreshes, and the app never sends grant_type=refresh_token at
+# all (see carrier-research/ppl-cz/api/login.md).
 API_BASE = "https://api.dhl.com/ecs/ppl/mobapp"
 REGISTRATIONS_URL = f"{API_BASE}/api/v1/registrations"
 REGISTRATION_CONFIRM_URL = f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
@@ -91,11 +98,9 @@ DIRECTION_OUTGOING = "outgoing"
 # --- Config entry data --------------------------------------------------------
 CONF_EMAIL = "email"
 CONF_ACCESS_TOKEN = "access_token"
-CONF_REFRESH_TOKEN = "refresh_token"
 # ISO timestamp computed at token-fetch time (now + expires_in) rather than the
 # raw expires_in itself — expires_in alone is useless across a restart without
-# an anchor, and the API returns it inconsistently typed (string on the
-# password grant, number on the refresh grant).
+# an anchor.
 CONF_TOKEN_EXPIRES_AT = "token_expires_at"
 
 # --- Options -----------------------------------------------------------------

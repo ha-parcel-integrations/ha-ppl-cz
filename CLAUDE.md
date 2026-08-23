@@ -50,31 +50,48 @@ immediately exchanges that password for a bearer token pair (Azure B2C ROPC,
 re-runs the same PIN request against the stored e-mail, then falls into
 `async_step_code` again — it is not a separate flow.
 
+**Session model: re-mint from a stored password, never refresh (2026-08-23).**
+PPL's B2C tenant hard-revokes the whole refresh-token lineage ~60 minutes
+after the original `grant_type=password` login, regardless of how many
+successful refreshes happened in between — confirmed live twice (see
+[issue #1](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/1)) and
+root-caused via a third APK teardown pass: the mojePPL app itself never sends
+`grant_type=refresh_token` at all. It stores the PIN-exchange Azure password
+and simply re-runs the password grant whenever a request 401s. This
+integration mirrors that instead of fighting it: `config_flow.py` persists
+`CONF_PASSWORD` (the same one-time password from `async_confirm_pin`) in the
+config entry alongside `CONF_EMAIL`, and `api.py`'s `_async_remint` re-runs
+`async_exchange_password(email, password)` on demand — there is no refresh
+call anywhere in this client. An entry from before 0.9.2 has no stored
+password, so `__init__.py` sends it through reauth once rather than
+crash-loop. **`diagnostics.py` redacts `password`** — it is a real, reusable
+credential, not a token, and must never appear in a diagnostics dump pasted
+into a public issue.
+
 **Token storage: an absolute expiry timestamp, not the raw `expires_in`.**
 `api.py._store_tokens` computes `token_expires_at = now + expires_in` at
-fetch time and persists that (plus `access_token`/`refresh_token`) in the
-config entry — `expires_in` alone is useless across a restart without an
-anchor, and the API returns it inconsistently typed (a JSON string on the
-password grant, a number on the refresh grant; `_parse_expires_in` guards
-both). `_async_ensure_fresh_token` refreshes **proactively**, 120s before
-that timestamp, so a poll doesn't race an about-to-expire token; a 401 still
-gets one reactive retry as a backstop. **Only a failed refresh call** (the
-refresh token itself lapsed or was revoked) raises `PPLCZAuthError` →
-`ConfigEntryAuthFailed` — a plain access-token expiry is invisible to the
-user, handled entirely inside the client.
+fetch time and persists that (plus `access_token`) in the config entry —
+`expires_in` alone is useless across a restart without an anchor, and it
+arrives as a JSON string (`_parse_expires_in` guards a non-parseable value).
+`_async_ensure_fresh_token` re-mints **proactively**, 120s before that
+timestamp, so a poll doesn't race an about-to-expire token; a 401 still gets
+one reactive retry as a backstop. **Only a failed re-mint** (the stored
+password itself was rejected) raises `PPLCZAuthError` → `ConfigEntryAuthFailed`
+— a plain access-token expiry is invisible to the user, handled entirely
+inside the client.
 
-**Refresh is serialised behind `PPLCZApiClient._refresh_lock`.** Azure
-rotates the refresh token on every use (single-use), so two callers racing
-a stale token — the scheduled poll and a manually-pressed refresh button
-are the two paths that can genuinely overlap, since HA's coordinator does
-not mutually exclude its own interval timer against `async_request_refresh`
-— would otherwise both redeem the same token; the loser gets a 400 and the
-integration wrongly forces reauth on a perfectly live account. Both the
-proactive path (`_async_ensure_fresh_token`) and the reactive 401 retry
-(`_async_refresh_if_current`) acquire the lock and re-check the access
-token afterwards, so a caller that lost the race skips its own refresh
-instead of repeating it. Fixed 2026-08-22, reported in
-[issue #1](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/1).
+**Re-mint is serialised behind `PPLCZApiClient._remint_lock`.** Two callers
+racing a stale token — the scheduled poll and a manually-pressed refresh
+button are the two paths that can genuinely overlap, since HA's coordinator
+does not mutually exclude its own interval timer against
+`async_request_refresh` — would otherwise both re-mint independently:
+harmless (a fresh password grant always succeeds on its own), but a wasted
+round-trip. Both the proactive path (`_async_ensure_fresh_token`) and the
+reactive 401 retry (`_async_refresh_if_current`) acquire the lock and
+re-check the access token afterwards, so a caller that lost the race skips
+its own re-mint. The lock itself predates the session-model change (fixed
+2026-08-22 for the same race under the old refresh-token model); it carries
+over unchanged.
 
 **The static `dhl-api-key` header is shipped deliberately.** It is
 hardcoded identically in every mojePPL install — normally the exact

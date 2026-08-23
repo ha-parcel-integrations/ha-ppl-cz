@@ -2,6 +2,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from homeassistant.const import CONF_PASSWORD
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -12,7 +13,6 @@ from custom_components.ppl_cz.const import (
     CONF_DELIVERED_FILTER_TYPE,
     CONF_EMAIL,
     CONF_INCLUDE_HISTORY,
-    CONF_REFRESH_TOKEN,
     DOMAIN,
     ParcelStatus,
 )
@@ -34,7 +34,7 @@ OUT = OUTGOING_CODE
 def _entry(**options) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
-        data={CONF_EMAIL: "a@b.c", CONF_REFRESH_TOKEN: "rt"},
+        data={CONF_EMAIL: "a@b.c", CONF_PASSWORD: "pw"},
         options={
             CONF_DELIVERED_FILTER_TYPE: "parcels",
             CONF_DELIVERED_FILTER_AMOUNT: 100,

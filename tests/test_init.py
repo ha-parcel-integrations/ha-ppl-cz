@@ -2,13 +2,13 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_PASSWORD
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ppl_cz.api import PPLCZApiError, PPLCZAuthError
 from custom_components.ppl_cz.const import (
     CONF_ACCESS_TOKEN,
     CONF_EMAIL,
-    CONF_REFRESH_TOKEN,
     DOMAIN,
 )
 
@@ -24,8 +24,8 @@ def _entry() -> MockConfigEntry:
         unique_id=EMAIL,
         data={
             CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: "S0meAzureP4ss!!",
             CONF_ACCESS_TOKEN: "access-abc",
-            CONF_REFRESH_TOKEN: "refresh-abc",
         },
     )
 
@@ -58,8 +58,8 @@ async def test_setup_and_unload(hass):
     assert entry.state is ConfigEntryState.NOT_LOADED
 
 
-async def test_missing_refresh_token_triggers_reauth(hass):
-    """A pre-account-model entry (no refresh token) goes to reauth, not a crash."""
+async def test_missing_password_triggers_reauth(hass):
+    """A pre-re-mint-model entry (no stored password) goes to reauth, not a crash."""
     entry = MockConfigEntry(
         domain=DOMAIN, title=EMAIL, unique_id=EMAIL, data={CONF_EMAIL: EMAIL}
     )
@@ -100,7 +100,7 @@ async def test_outage_retries_instead_of_reauth(hass):
 
 
 async def test_token_rotation_persisted(hass):
-    """A rotated refresh token from a proactive/401 refresh is saved to the entry."""
+    """A re-minted access token from a proactive/401 renewal is saved to the entry."""
     entry = _entry()
     entry.add_to_hass(hass)
     client = _client([incoming_shipment()])
@@ -116,12 +116,9 @@ async def test_token_rotation_persisted(hass):
 
     from datetime import datetime, timezone
 
-    captured["on_tokens_updated"](
-        "new-access", "new-refresh", datetime.now(timezone.utc)
-    )
+    captured["on_tokens_updated"]("new-access", datetime.now(timezone.utc))
 
     assert entry.data[CONF_ACCESS_TOKEN] == "new-access"
-    assert entry.data[CONF_REFRESH_TOKEN] == "new-refresh"
 
 
 async def test_per_parcel_sensor_spawn_and_remove(hass):

@@ -22,8 +22,8 @@ from custom_components.ppl_cz.const import (
 
 from .payloads import (
     PASSWORD_GRANT_TOKENS,
-    REFRESH_GRANT_TOKENS,
     REGISTRATION_CONFIRM_BODY,
+    REMINTED_TOKENS,
     events_for_delivered,
     incoming_shipment,
     shipments_envelope,
@@ -149,10 +149,9 @@ async def test_exchange_password_stores_tokens_and_reports_update():
     await client.async_exchange_password("a@b.c", "onetimepass")
 
     assert client.access_token == PASSWORD_GRANT_TOKENS["access_token"]
-    assert client.refresh_token == PASSWORD_GRANT_TOKENS["refresh_token"]
     assert client.token_expires_at is not None
     assert len(updated) == 1
-    assert updated[0][0] == PASSWORD_GRANT_TOKENS["access_token"]
+    assert updated[0] == (client.access_token, client.token_expires_at)
 
 
 @pytest.mark.parametrize("status", [400, 401])
@@ -174,33 +173,38 @@ async def test_exchange_password_missing_token_raises():
         await PPLCZApiClient(session).async_exchange_password("a@b.c", "onetimepass")
 
 
-# --- refresh ----------------------------------------------------------------
+# --- re-mint (renewal via a fresh password grant, not a refresh grant) ------
 
 
-async def test_refresh_rotates_the_refresh_token():
+async def test_remint_replaces_the_access_token():
+    """PPL's B2C tenant hard-revokes the refresh-token lineage ~1h after
+    login regardless of intervening refreshes, and the app itself never
+    sends grant_type=refresh_token — so renewal re-runs the password grant
+    from the stored credential instead (see api.py's module docstring)."""
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, REFRESH_GRANT_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [(200, REMINTED_TOKENS)],
             ("get", SHIPMENTS_URL): [(200, shipments_envelope([]))],
         }
     )
     client = PPLCZApiClient(
         session,
+        email="a@b.c",
+        password="pw",
         access_token="stale",
-        refresh_token="old-refresh",
         token_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
     )
     await client.async_get_parcels()
-    assert client.refresh_token == REFRESH_GRANT_TOKENS["refresh_token"]
+    assert client.access_token == REMINTED_TOKENS["access_token"]
 
 
-async def test_concurrent_requests_share_a_single_refresh():
+async def test_concurrent_requests_share_a_single_remint():
     """Two callers racing a stale token (e.g. the refresh button firing
-    alongside the scheduled poll) must not both redeem the same refresh
-    token — Azure rotates it on use, so the loser would get a 400."""
+    alongside the scheduled poll) must not both re-mint independently —
+    wasteful, not harmful, but worth avoiding."""
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, REFRESH_GRANT_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [(200, REMINTED_TOKENS)],
             ("get", SHIPMENTS_URL): [
                 (200, shipments_envelope([])),
                 (200, shipments_envelope([])),
@@ -209,60 +213,61 @@ async def test_concurrent_requests_share_a_single_refresh():
     )
     client = PPLCZApiClient(
         session,
+        email="a@b.c",
+        password="pw",
         access_token="stale",
-        refresh_token="old-refresh",
         token_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
     )
     results = await asyncio.gather(
         client.async_get_parcels(), client.async_get_parcels()
     )
     assert results == [[], []]
-    assert client.refresh_token == REFRESH_GRANT_TOKENS["refresh_token"]
+    assert client.access_token == REMINTED_TOKENS["access_token"]
     assert session.calls.count(("post", AZURE_TOKEN_URL)) == 1
 
 
-async def test_refresh_without_token_raises_auth_error():
-    client = PPLCZApiClient(_Session({}), refresh_token=None)
+async def test_remint_without_credentials_raises_auth_error():
+    client = PPLCZApiClient(_Session({}))
     with pytest.raises(PPLCZAuthError):
         await client.async_get_parcels()
 
 
 @pytest.mark.parametrize("status", [400, 401, 403])
-async def test_refresh_rejected_raises_auth_error(status):
+async def test_remint_rejected_raises_auth_error(status):
     session = _Session({("post", AZURE_TOKEN_URL): [(status, {})]})
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_parcels()
 
 
-async def test_refresh_rejected_logs_azure_error_body(caplog):
-    body = {"error": "invalid_grant", "error_description": "AADB2C90080: expired"}
+async def test_remint_rejected_logs_azure_error_body(caplog):
+    body = {"error": "invalid_grant", "error_description": "AADB2C90129: revoked"}
     session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with caplog.at_level("DEBUG"):
         with pytest.raises(PPLCZAuthError):
             await client.async_get_parcels()
     assert "invalid_grant" in caplog.text
-    assert "AADB2C90080: expired" in caplog.text
+    assert "AADB2C90129: revoked" in caplog.text
 
 
-async def test_refresh_rejected_unparseable_body_does_not_mask_auth_error():
+async def test_remint_rejected_unparseable_body_does_not_mask_auth_error():
     session = _Session({("post", AZURE_TOKEN_URL): [(400, ValueError("nope"))]})
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_parcels()
 
 
-async def test_refresh_outage_raises_api_error():
+async def test_remint_outage_raises_api_error():
     session = _Session({("post", AZURE_TOKEN_URL): [(500, {})]})
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZApiError):
         await client.async_get_parcels()
 
 
-async def test_refresh_network_error_is_api_error():
+async def test_remint_network_error_is_api_error():
     session = _Session({("post", AZURE_TOKEN_URL): [aiohttp.ClientError()]})
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZApiError):
         await client.async_get_parcels()
 
@@ -270,26 +275,26 @@ async def test_refresh_network_error_is_api_error():
 # --- authed requests / retry-on-401 -----------------------------------------
 
 
-async def test_401_triggers_one_refresh_and_retry():
+async def test_401_triggers_one_remint_and_retry():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REFRESH_GRANT_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
             ("get", SHIPMENTS_URL): [(401, {}), (200, shipments_envelope([]))],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     assert await client.async_get_parcels() == []
-    assert client.refresh_token == REFRESH_GRANT_TOKENS["refresh_token"]
+    assert client.access_token == REMINTED_TOKENS["access_token"]
 
 
 async def test_persistent_401_raises_auth_error():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REFRESH_GRANT_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
             ("get", SHIPMENTS_URL): [(401, {}), (401, {})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_parcels()
 
@@ -301,7 +306,7 @@ async def test_authed_request_non_200_raises_api_error():
             ("get", SHIPMENTS_URL): [(503, {})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZApiError):
         await client.async_get_parcels()
 
@@ -317,7 +322,7 @@ async def test_get_parcels_returns_items():
             ("get", SHIPMENTS_URL): [(200, shipments_envelope(items))],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     parcels = await client.async_get_parcels()
     assert len(parcels) == 1
     assert parcels[0]["number"] == items[0]["number"]
@@ -331,7 +336,7 @@ async def test_get_parcels_skips_non_dict_entries():
             ("get", SHIPMENTS_URL): [(200, envelope)],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     assert len(await client.async_get_parcels()) == 1
 
 
@@ -342,7 +347,7 @@ async def test_get_parcels_missing_items_raises():
             ("get", SHIPMENTS_URL): [(200, {"metadata": {}})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZApiError):
         await client.async_get_parcels()
 
@@ -358,7 +363,7 @@ async def test_get_shipment_events_accepts_bare_list():
             ("get", EVENTS_URL): [(200, events)],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     result = await client.async_get_shipment_events("id-1")
     assert len(result) == len(events)
 
@@ -371,7 +376,7 @@ async def test_get_shipment_events_accepts_items_wrapper():
             ("get", EVENTS_URL): [(200, {"items": events})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     result = await client.async_get_shipment_events("id-1")
     assert len(result) == len(events)
 
@@ -383,7 +388,7 @@ async def test_get_shipment_events_unexpected_shape_returns_none():
             ("get", EVENTS_URL): [(200, "nope")],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     assert await client.async_get_shipment_events("id-1") is None
 
 
@@ -394,17 +399,17 @@ async def test_get_shipment_events_outage_returns_none():
             ("get", EVENTS_URL): [(500, {})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     assert await client.async_get_shipment_events("id-1") is None
 
 
 async def test_get_shipment_events_auth_error_propagates():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REFRESH_GRANT_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
             ("get", EVENTS_URL): [(401, {}), (401, {})],
         }
     )
-    client = PPLCZApiClient(session, refresh_token="rt")
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_shipment_events("id-1")

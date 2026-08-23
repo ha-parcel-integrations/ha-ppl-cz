@@ -17,10 +17,13 @@ from . import PPLCZConfigEntry
 # toDeliveryPoint's street/city/zipCode, any cod amount, the tracking number
 # itself, and the access_token/dhl-api-key headers.
 TO_REDACT = {
-    # account / session (entry.data)
+    # account / session (entry.data) — "password" is the stored PIN-exchange
+    # Azure password the client re-authenticates with (see api.py); it is a
+    # live, reusable credential, not a token, so it must never appear
+    # unredacted in diagnostics pasted into a public issue.
     "email",
+    "password",
     "access_token",
-    "refresh_token",
     "token_expires_at",
     "dhl-api-key",
     # canonical fields we publish ourselves

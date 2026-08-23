@@ -18,7 +18,9 @@ REGISTRATION_CONFIRM_BODY = {
     "password": "S0meAzureP4ss!!",
 }
 
-# expires_in arrives as a *string* on the password grant.
+# expires_in arrives as a *string* on the password grant. A real response
+# also carries a refresh_token (Azure grants one since the request asks for
+# offline_access), but the client never stores or uses it — see api.py.
 PASSWORD_GRANT_TOKENS = {
     "access_token": "access.eyJ.token",
     "token_type": "Bearer",
@@ -26,21 +28,14 @@ PASSWORD_GRANT_TOKENS = {
     "refresh_token": "refresh-abc",
 }
 
-# expires_in arrives as a *number* on the refresh grant, plus extra fields
-# the password grant doesn't return.
-REFRESH_GRANT_TOKENS = {
+# A second, distinct password-grant response — used to prove a re-mint
+# actually replaces the access token, not the refresh grant (the app never
+# sends grant_type=refresh_token at all).
+REMINTED_TOKENS = {
     "access_token": "access.eyJ.new",
-    "id_token": "id.eyJ.token",
     "token_type": "Bearer",
-    "not_before": 1735689600,
-    "expires_in": 3600,
-    "expires_on": 1735693200,
-    "resource": "e8286178-1efe-4e0a-8cb8-98f126391a3c",
-    "id_token_expires_in": 3600,
-    "profile_info": "profile.eyJ.info",
-    "scope": "openid offline_access",
+    "expires_in": "3600",
     "refresh_token": "refresh-def",
-    "refresh_token_expires_in": 1209600,
 }
 
 

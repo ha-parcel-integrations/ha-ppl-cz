@@ -9,8 +9,8 @@ async def test_diagnostics_redacts_and_counts(hass):
     entry = MagicMock()
     entry.data = {
         "email": "fam@example.com",
+        "password": "S0meAzureP4ss!!",
         "access_token": "secret-access",
-        "refresh_token": "secret-refresh",
         "token_expires_at": "2026-01-01T00:00:00+00:00",
     }
     entry.options = {"refresh_interval": 30}
@@ -36,8 +36,8 @@ async def test_diagnostics_redacts_and_counts(hass):
 
     assert result["counts"]["incoming_active"] == 1
     assert result["entry_data"]["email"] == "**REDACTED**"
+    assert result["entry_data"]["password"] == "**REDACTED**"
     assert result["entry_data"]["access_token"] == "**REDACTED**"
-    assert result["entry_data"]["refresh_token"] == "**REDACTED**"
     incoming = result["incoming"][0]
     assert incoming["barcode"] == "**REDACTED**"
     assert incoming["sender"] == "**REDACTED**"

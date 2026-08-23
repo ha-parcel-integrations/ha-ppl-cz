@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.const import CONF_PASSWORD
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ppl_cz.api import PPLCZApiError, PPLCZAuthError, PPLCZInvalidPin
@@ -12,7 +13,6 @@ from custom_components.ppl_cz.const import (
     CONF_EMAIL,
     CONF_INCLUDE_HISTORY,
     CONF_REFRESH_INTERVAL,
-    CONF_REFRESH_TOKEN,
     DOMAIN,
 )
 
@@ -25,7 +25,6 @@ def _mock_client(**overrides) -> MagicMock:
     client.async_confirm_pin = AsyncMock(return_value="onetimepass")
     client.async_exchange_password = AsyncMock()
     client.access_token = "access-abc"
-    client.refresh_token = "refresh-abc"
     client.token_expires_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     for key, value in overrides.items():
         setattr(client, key, value)
@@ -59,8 +58,8 @@ async def test_full_login_flow(hass):
     assert result["type"] == "create_entry"
     assert result["title"] == EMAIL
     assert result["data"][CONF_EMAIL] == EMAIL
+    assert result["data"][CONF_PASSWORD] == "onetimepass"
     assert result["data"][CONF_ACCESS_TOKEN] == "access-abc"
-    assert result["data"][CONF_REFRESH_TOKEN] == "refresh-abc"
     client.async_request_pin.assert_awaited_once()
     client.async_confirm_pin.assert_awaited_once()
     client.async_exchange_password.assert_awaited_once_with(EMAIL, "onetimepass")
@@ -156,8 +155,8 @@ def _entry() -> MockConfigEntry:
         unique_id=EMAIL,
         data={
             CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: "stale-password",
             CONF_ACCESS_TOKEN: "stale",
-            CONF_REFRESH_TOKEN: "stale-refresh",
         },
     )
 
@@ -176,7 +175,7 @@ async def test_reauth_flow(hass):
         )
     assert result["type"] == "abort"
     assert result["reason"] == "reauth_successful"
-    assert entry.data[CONF_REFRESH_TOKEN] == "refresh-abc"
+    assert entry.data[CONF_PASSWORD] == "onetimepass"
 
 
 async def test_reauth_request_pin_error(hass):
@@ -208,7 +207,7 @@ async def test_options_flow(hass):
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id=EMAIL,
-        data={CONF_EMAIL: EMAIL, CONF_ACCESS_TOKEN: "a", CONF_REFRESH_TOKEN: "r"},
+        data={CONF_EMAIL: EMAIL, CONF_PASSWORD: "pw", CONF_ACCESS_TOKEN: "a"},
         options={},
     )
     entry.add_to_hass(hass)

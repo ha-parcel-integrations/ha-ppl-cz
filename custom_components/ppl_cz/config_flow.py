@@ -23,7 +23,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.const import CONF_EMAIL
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
@@ -41,7 +41,6 @@ from .const import (
     CONF_DELIVERED_FILTER_TYPE,
     CONF_INCLUDE_HISTORY,
     CONF_REFRESH_INTERVAL,
-    CONF_REFRESH_TOKEN,
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_DELIVERED_FILTER_AMOUNT,
     DEFAULT_DELIVERED_FILTER_TYPE,
@@ -138,10 +137,14 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             else:
                 await self.async_set_unique_id(self._email)
+                # The password, not a refresh token, is what has to survive a
+                # restart — PPL's B2C tenant hard-revokes the refresh-token
+                # lineage ~1h after login regardless, and the app itself
+                # re-mints from this same stored credential (see api.py).
                 data = {
                     CONF_EMAIL: self._email,
+                    CONF_PASSWORD: password,
                     CONF_ACCESS_TOKEN: client.access_token,
-                    CONF_REFRESH_TOKEN: client.refresh_token,
                     CONF_TOKEN_EXPIRES_AT: client.token_expires_at.isoformat(),
                 }
                 if self._reauth_entry is not None:

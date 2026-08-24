@@ -1,6 +1,7 @@
 """Tests for the PPL CZ setup / unload / reauth lifecycle."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -39,6 +40,27 @@ def _client(items=None) -> MagicMock:
 
 def _patch(client):
     return patch("custom_components.ppl_cz.PPLCZApiClient", return_value=client)
+
+
+async def test_setup_uses_a_cookie_free_session(hass, stub_ppl_session):
+    """The entry must not ride on Home Assistant's shared cookie jar.
+
+    Azure B2C's ``x-ms-cpim-*`` cookies accumulate there and eventually break
+    the ROPC grant until HA restarts — see ``session.py``.
+    """
+    entry = _entry()
+    entry.add_to_hass(hass)
+    with _patch(_client([incoming_shipment()])):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    jar = stub_ppl_session.call_args.kwargs["cookie_jar"]
+    assert isinstance(jar, aiohttp.DummyCookieJar)
+    # Closed on unload, so a reload doesn't leak a session per attempt.
+    assert stub_ppl_session.call_args.kwargs["auto_cleanup"] is False
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    stub_ppl_session.return_value.close.assert_awaited()
 
 
 async def test_setup_and_unload(hass):

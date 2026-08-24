@@ -9,7 +9,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PPLCZApiClient
 from .const import (
@@ -19,6 +18,7 @@ from .const import (
 )
 from .coordinator import PPLCZCoordinator
 from .parcels import parse_iso
+from .session import async_create_ppl_session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,8 +61,11 @@ async def async_setup_entry(
             },
         )
 
+    session = async_create_ppl_session(hass)
+    entry.async_on_unload(session.close)
+
     client = PPLCZApiClient(
-        async_get_clientsession(hass),
+        session,
         email=email,
         password=password,
         access_token=entry.data.get(CONF_ACCESS_TOKEN),

@@ -33,6 +33,8 @@ CONFIRM_URL = REGISTRATION_CONFIRM_URL.format(registration_session_id="reg-sessi
 EVENTS_URL = SHIPMENT_EVENTS_URL.format(shipment_id="id-1")
 
 EMPTY_BODY = object()  # a 200 with a zero-byte body, the stale-connection symptom
+HTML_ERROR_PAGE = object()  # a 200 with an Azure B2C outage page instead of JSON
+_HTML_ERROR_PAGE_BODY = b"<!DOCTYPE html>\r\n<!-- CorrelationId: test -->\r\n<html/>"
 
 
 class _Resp:
@@ -41,11 +43,17 @@ class _Resp:
         self._body = body
 
     async def read(self) -> bytes:
-        return b"" if self._body is EMPTY_BODY else b"x"
+        if self._body is EMPTY_BODY:
+            return b""
+        if self._body is HTML_ERROR_PAGE:
+            return _HTML_ERROR_PAGE_BODY
+        return b"x"
 
     async def json(self, content_type=None):
         if isinstance(self._body, Exception):
             raise self._body
+        if self._body is HTML_ERROR_PAGE:
+            raise ValueError("unexpected character: line 1 column 1 (char 0)")
         return self._body
 
     async def __aenter__(self):
@@ -142,6 +150,15 @@ async def test_confirm_pin_unparseable_body_raises():
     session = _Session({("put", CONFIRM_URL): [(200, ValueError("nope"))]})
     with pytest.raises(PPLCZApiError):
         await PPLCZApiClient(session).async_confirm_pin("reg-session-1", "1234", "dev1")
+
+
+async def test_unparseable_body_logs_raw_content(caplog):
+    session = _Session({("put", CONFIRM_URL): [(200, ValueError("nope"))]})
+    with caplog.at_level("DEBUG"):
+        with pytest.raises(PPLCZApiError):
+            await PPLCZApiClient(session).async_confirm_pin("reg-session-1", "1234", "dev1")
+    assert "unparseable body" in caplog.text
+    assert "b'x'" in caplog.text
 
 
 # --- exchange password / token storage -------------------------------------
@@ -303,6 +320,31 @@ async def test_remint_raises_after_two_empty_bodies():
         await client.async_get_parcels()
 
 
+async def test_remint_retries_once_on_html_error_page():
+    """Confirmed live 2026-08-24: Azure B2C can hand back its own HTML
+    outage page on a 200 instead of the token JSON — worth one retry like
+    the empty-body case, not an immediate auth rejection."""
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, HTML_ERROR_PAGE), (200, REMINTED_TOKENS)],
+            ("get", SHIPMENTS_URL): [(200, shipments_envelope([]))],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    await client.async_get_parcels()
+    assert client.access_token == REMINTED_TOKENS["access_token"]
+    assert session.calls.count(("post", AZURE_TOKEN_URL)) == 2
+
+
+async def test_remint_raises_after_two_html_error_pages():
+    session = _Session(
+        {("post", AZURE_TOKEN_URL): [(200, HTML_ERROR_PAGE), (200, HTML_ERROR_PAGE)]}
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    with pytest.raises(PPLCZApiError):
+        await client.async_get_parcels()
+
+
 # --- authed requests / retry-on-401 -----------------------------------------
 
 
@@ -364,6 +406,18 @@ async def test_authed_request_raises_after_two_empty_bodies():
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZApiError):
         await client.async_get_parcels()
+
+
+async def test_authed_request_retries_once_on_html_error_page():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", SHIPMENTS_URL): [(200, HTML_ERROR_PAGE), (200, shipments_envelope([]))],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    assert await client.async_get_parcels() == []
+    assert session.calls.count(("get", SHIPMENTS_URL)) == 2
 
 
 # --- shipments ---------------------------------------------------------------

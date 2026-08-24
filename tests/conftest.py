@@ -1,5 +1,6 @@
 """pytest configuration for the PPL CZ test suite."""
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.plugins import hass  # noqa: F401
@@ -9,6 +10,21 @@ from pytest_homeassistant_custom_component.plugins import hass  # noqa: F401
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Make ``custom_components.ppl_cz`` loadable from config-flow / setup tests."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def stub_ppl_session():
+    """Hand out a throwaway session instead of a real cookie-free one.
+
+    The integration creates its own session and closes it on unload (see
+    ``session.py``); the test harness resolves that back to Home Assistant's
+    shared session, which raises rather than let itself be closed.
+    """
+    with patch(
+        "custom_components.ppl_cz.session.async_create_clientsession",
+        return_value=MagicMock(close=AsyncMock()),
+    ) as create:
+        yield create
 
 
 if sys.platform == "win32":

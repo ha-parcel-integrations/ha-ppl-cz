@@ -60,6 +60,10 @@ _REFRESH_MARGIN = timedelta(seconds=120)
 # path.
 _DEFAULT_EXPIRES_IN_SECONDS = 3600
 
+# Generous enough to capture a whole Azure outage page (a few KB, confirmed
+# live) in the debug log, without letting a pathologically large body flood it.
+_LOGGED_BODY_LIMIT = 8000
+
 
 class PPLCZApiError(Exception):
     """Raised when a PPL CZ API call fails for a non-auth reason."""
@@ -86,19 +90,41 @@ class PPLCZInvalidPin(PPLCZApiError):
         super().__init__(detail)
 
 
-class _EmptyResponseError(PPLCZApiError):
+class _TransientBodyError(PPLCZApiError):
+    """A ``200`` body that isn't the JSON API contract but also isn't a real rejection.
+
+    Callers retry once on this, not on any parse failure — a
+    malformed-but-JSON-shaped body still surfaces immediately as a real
+    API-contract problem.
+    """
+
+
+class _EmptyResponseError(_TransientBodyError):
     """A ``200`` with a zero-byte body — seen after a laptop wakes from sleep.
 
     A stale pooled connection can hand back a syntactically valid but empty
-    response instead of erroring outright. Callers retry once on this
-    specific signal rather than on any parse failure, since a non-empty but
-    malformed body is a real API-contract problem worth surfacing
-    immediately.
+    response instead of erroring outright.
     """
 
     def __init__(self) -> None:
         """No detail needed — the empty body is the whole story."""
         super().__init__("empty response body")
+
+
+class _UpstreamErrorPageError(_TransientBodyError):
+    """A ``200`` whose body is an HTML page, not JSON.
+
+    Confirmed live on the Azure token endpoint (2026-08-24): an outage page
+    stamped with Azure's own ``CorrelationId``/``DataCenter`` comments, sent
+    with an HTTP 200 — Azure B2C's own server-side error, not a network-level
+    artifact. Treated as transient like :class:`_EmptyResponseError` rather
+    than a credential rejection, since a real ``AADB2C90129``-style rejection
+    comes back as JSON with a proper error code.
+    """
+
+    def __init__(self) -> None:
+        """No detail needed — the caller already logged the raw body."""
+        super().__init__("HTML error page instead of JSON")
 
 
 class PPLCZApiClient:
@@ -240,10 +266,10 @@ class PPLCZApiClient:
 
         Mirrors the app's own session model: there is no refresh call to
         fall back to (see the module docstring), only the stored
-        email/password. Retries once on an empty response body — this is
-        the token endpoint, most likely to be hit right after a long idle
-        gap (e.g. the host waking from sleep) with a stale pooled
-        connection still in play.
+        email/password. Retries once on a transient (empty or HTML-error-page)
+        response body — this is the token endpoint, most likely to be hit
+        right after a long idle gap (e.g. the host waking from sleep) with a
+        stale pooled connection still in play.
         """
         if not self._email or not self._password:
             raise PPLCZAuthError("no stored PPL CZ credentials to re-authenticate with")
@@ -251,10 +277,13 @@ class PPLCZApiClient:
             try:
                 await self.async_exchange_password(self._email, self._password)
                 return
-            except _EmptyResponseError:
+            except _TransientBodyError as err:
                 if attempt == 1:
                     raise
-                _LOGGER.debug("PPL CZ token exchange got an empty body, retrying once")
+                _LOGGER.debug(
+                    "PPL CZ token exchange got a transient body (%s), retrying once",
+                    err.detail,
+                )
             except aiohttp.ClientError as err:
                 raise PPLCZApiError(f"re-mint network error ({err})") from err
 
@@ -307,10 +336,14 @@ class PPLCZApiClient:
                     raise PPLCZApiError(f"HTTP {response.status}")
                 try:
                     return await _json(response)
-                except _EmptyResponseError:
+                except _TransientBodyError as err:
                     if attempt == 1:
                         raise
-                    _LOGGER.debug("PPL CZ %s got an empty body, retrying once", url)
+                    _LOGGER.debug(
+                        "PPL CZ %s got a transient body (%s), retrying once",
+                        url,
+                        err.detail,
+                    )
                     continue
         raise PPLCZAuthError("PPL CZ rejected the access token")
 
@@ -369,8 +402,16 @@ def _parse_expires_in(value: Any) -> int:
 async def _json(response: aiohttp.ClientResponse) -> Any:
     """Parse a JSON body, tolerating a non-JSON content type.
 
-    A zero-byte body raises :class:`_EmptyResponseError` rather than the
-    generic parse error — see that class for why it gets its own retry.
+    A zero-byte body raises :class:`_EmptyResponseError`, an HTML body raises
+    :class:`_UpstreamErrorPageError` — see those classes for why they get
+    their own retry. Any other unparseable body logs up to
+    ``_LOGGED_BODY_LIMIT`` chars at DEBUG before raising a plain
+    :class:`PPLCZApiError` — the exception itself only says *where* orjson
+    gave up, not *what* was actually returned, and that's needed to tell a
+    real API-contract change apart from the two known-transient shapes
+    above. The cap is generous enough to capture a whole outage page
+    (a few KB, confirmed live) without letting a pathologically large body
+    flood the log.
     """
     raw = await response.read()
     if not raw:
@@ -378,6 +419,13 @@ async def _json(response: aiohttp.ClientResponse) -> Any:
     try:
         return await response.json(content_type=None)
     except ValueError as err:
+        _LOGGER.debug(
+            "PPL CZ unparseable body (status %s): %r",
+            response.status,
+            raw[:_LOGGED_BODY_LIMIT],
+        )
+        if raw.lstrip()[:1] == b"<":
+            raise _UpstreamErrorPageError from err
         raise PPLCZApiError(f"unparseable body ({err})") from err
 
 

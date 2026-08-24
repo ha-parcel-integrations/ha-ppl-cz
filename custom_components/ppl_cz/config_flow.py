@@ -27,7 +27,6 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
     PPLCZApiClient,
@@ -49,6 +48,7 @@ from .const import (
     DOMAIN,
     REFRESH_INTERVAL_OPTIONS,
 )
+from .session import async_create_ppl_session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
             # confirmed working; nothing requires that specific format.
             device_id = str(uuid.uuid4())
             registration_session_id = str(uuid.uuid4())
-            client = PPLCZApiClient(async_get_clientsession(self.hass))
+            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
             try:
                 await client.async_request_pin(
                     email, device_id, registration_session_id
@@ -121,7 +121,7 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 2: confirm the PIN and mint the account's token pair."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            client = PPLCZApiClient(async_get_clientsession(self.hass))
+            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
             try:
                 password = await client.async_confirm_pin(
                     self._registration_session_id,
@@ -187,7 +187,7 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._device_id = str(uuid.uuid4())
             self._registration_session_id = str(uuid.uuid4())
-            client = PPLCZApiClient(async_get_clientsession(self.hass))
+            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
             try:
                 await client.async_request_pin(
                     self._email, self._device_id, self._registration_session_id

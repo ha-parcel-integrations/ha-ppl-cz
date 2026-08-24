@@ -68,18 +68,48 @@ crash-loop. **`diagnostics.py` redacts `password`** — it is a real, reusable
 credential, not a token, and must never appear in a diagnostics dump pasted
 into a public issue.
 
-**A `200` with an empty body gets one silent retry, not a forced reauth
-(2026-08-23).** Observed live on the local dev instance: the token endpoint
+**A `200` with a transient (non-JSON) body gets a silent retry, not a
+forced reauth (2026-08-23, widened 2026-08-24).** Observed live on the local
+dev instance: the token endpoint
 and the shipments GET both occasionally hand back a syntactically valid
-`200` with a zero-byte body — a stale pooled `aiohttp` connection surviving
-past a long idle gap (the host waking from sleep is the one case caught so
-far) rather than a real rejection. `_json()` raises the dedicated
-`_EmptyResponseError` for this specific case (not any unparseable body —
-malformed-but-nonempty JSON still surfaces immediately as a real
-API-contract problem); `_async_remint` and `_authed_request` each retry
-exactly once on it before giving up. Distinct from the `AADB2C90129`
-revocation this integration already handles — that one is a genuine
-password rejection and correctly still raises `PPLCZAuthError`.
+`200` whose body isn't the JSON contract, rather than a real rejection. Two
+confirmed shapes: a zero-byte body (a stale pooled `aiohttp` connection
+surviving past a long idle gap — the host waking from sleep is the one case
+caught so far), and an HTML page stamped with Azure's own
+`CorrelationId`/`DataCenter` comments — B2C's own server-side exception page
+(`GLOBALEX.Detail`: *"AADB2C: We are unable to sign you in. Please contact
+the administrator to adjust the number of authentication steps."*), not a
+network-level artifact. That second shape has a known cause and a real fix —
+see the cookie-jar note below; the retry here is only a backstop.
+`_json()` raises `_EmptyResponseError` /
+`_UpstreamErrorPageError` (both `_TransientBodyError`) for these two specific
+shapes only — not any unparseable body; malformed-but-JSON-shaped content
+still surfaces immediately as a real API-contract problem. Distinct from the
+`AADB2C90129` revocation this integration already handles — that one comes
+back as JSON with a proper error code and correctly still raises
+`PPLCZAuthError`.
+
+**Never put this integration on HA's shared aiohttp session — Azure B2C
+cookies poison it (2026-08-24, root cause of the above).** The HTML-error-page
+shape turned out not to be an Azure outage at all. Once it starts, **every**
+re-mint fails until Home Assistant is restarted — and a restart is precisely
+what clears the shared cookie jar, since the access token, password and email
+all survive it in the config entry and so can't be the trigger. The failure
+also follows the client to a *different* Azure data centre (`AM3` on one
+incident, `DB3` on the next, both failing), so it travels in the request, not
+on one unhealthy backend. B2C stamps `x-ms-cpim-*` cookies onto every ROPC
+exchange — among them the one tracking in-flight journey transactions — and
+accumulated across a long-lived shared jar they eventually break the very
+journey step the error message names.
+
+`session.py`'s `async_create_ppl_session` therefore hands out a dedicated
+session with an `aiohttp.DummyCookieJar`; `__init__.py` closes it on unload,
+the config flow lets HA's shutdown do it (`auto_cleanup=True`) since its
+sessions are short-lived. **No call in this integration needs a cookie**, so
+never swap this back to `async_get_clientsession` — `test_setup_uses_a_cookie_free_session`
+guards it. The one-retry handling above stays as a cheap backstop for a
+genuinely transient body, but it was never able to fix this: a retry inside
+the same poll reuses the same jar and fails identically.
 
 **Token storage: an absolute expiry timestamp, not the raw `expires_in`.**
 `api.py._store_tokens` computes `token_expires_at = now + expires_in` at

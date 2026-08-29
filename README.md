@@ -53,7 +53,7 @@ Part of the [ha-parcel-integrations](https://github.com/ha-parcel-integrations) 
 
 ## Requirements
 
-- Home Assistant 2024.7 or newer
+- Home Assistant 2024.12 or newer
 - A mojePPL account (the app's e-mail + PIN login — no password needed)
 
 ## Installation
@@ -103,6 +103,9 @@ Standard HA removal applies: **Settings → Devices & Services → PPL CZ → �
 | `sensor.ppl_cz_<email>_last_successful_update` | Diagnostic: when PPL CZ was last polled successfully |
 
 A delivered parcel moves from its per-parcel sensor to the matching delivered sensor automatically.
+
+A **`button.ppl_cz_<email>_refresh`** entity triggers an immediate poll outside
+the regular interval.
 
 ## Parcel status reference
 

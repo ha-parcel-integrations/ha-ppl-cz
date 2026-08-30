@@ -13,6 +13,25 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
+def reset_one_shot_warnings():
+    """Clear the "already warned this session" flags between tests.
+
+    They are module-level by design -- a user must not be told about the
+    same unmapped status or unconfirmed field on every poll -- but that also
+    makes them leak across tests, so whether a warning fires would otherwise
+    depend on test order.
+    """
+    from custom_components.ppl_cz import parcels
+
+    parcels._unmapped_statuses_logged.clear()
+    parcels._items_shape_logged = False
+    parcels._events_shape_logged = False
+    parcels._delivery_point_type_logged = False
+    parcels._unknown_direction_logged.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def stub_ppl_session():
     """Hand out a throwaway session instead of a real cookie-free one.
 

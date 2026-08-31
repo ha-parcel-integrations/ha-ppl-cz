@@ -40,7 +40,7 @@
           "delivered": {
             "name": "Bezorgde pakketten",
             "data": {
-              "delivered_filter_type": "Filter op",
+              "delivered_filter_type": "Filteren op",
               "delivered_filter_amount": "Aantal"
             },
             "data_description": {
@@ -51,14 +51,14 @@
           "history": {
             "name": "Pakketgeschiedenis",
             "data": {
-              "include_history": "Statusgeschiedenis opnemen"
+              "include_history": "Statusgeschiedenis toevoegen"
             },
             "data_description": {
-              "include_history": "Voeg per pakket een attribuut toe met elke statuswijziging (tijdstip, status, oorspronkelijke tekst). Kost één extra verzoek per pakket per verversing. Standaard uit."
+              "include_history": "Voegt per pakket een geschiedenisattribuut toe met elke statusupdate (tijdstip, status, oorspronkelijke tekst). Kost één extra verzoek per pakket per verversing. Standaard uit."
             }
           },
           "polling": {
-            "name": "Vernieuwen",
+            "name": "Verversen",
             "data": {
               "refresh_interval": "Ververs elke"
             },
@@ -99,7 +99,7 @@
   "entity": {
     "button": {
       "refresh": {
-        "name": "Vernieuwen"
+        "name": "Verversen"
       }
     },
     "sensor": {
@@ -108,7 +108,7 @@
         "unit_of_measurement": "pakketten"
       },
       "awaiting_pickup": {
-        "name": "Wacht op ophalen",
+        "name": "Klaar voor afhalen",
         "unit_of_measurement": "pakketten"
       },
       "delivered_parcels": {
@@ -124,7 +124,7 @@
         "unit_of_measurement": "pakketten"
       },
       "last_update": {
-        "name": "Laatste geslaagde update"
+        "name": "Laatste succesvolle update"
       },
       "parcel": {
         "name": "Pakket {barcode}"

@@ -53,7 +53,6 @@ Part of the [ha-parcel-integrations](https://github.com/ha-parcel-integrations) 
 
 ## Requirements
 
-- Home Assistant 2024.12 or newer
 - A mojePPL account (the app's e-mail + PIN login — no password needed)
 
 ## Installation

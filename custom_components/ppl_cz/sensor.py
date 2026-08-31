@@ -21,6 +21,7 @@ from . import PPLCZConfigEntry
 from .const import DOMAIN
 from .coordinator import PPLCZCoordinator
 from .device import ATTRIBUTION, build_device_info
+from .parcels import ParcelStatus
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     non_parcel_unique_ids = {
         f"{entry_id}_incoming_parcels",
+        f"{entry_id}_awaiting_pickup",
         f"{entry_id}_delivered_parcels",
         f"{entry_id}_outgoing_parcels",
         f"{entry_id}_outgoing_delivered_parcels",
@@ -78,6 +80,7 @@ async def async_setup_entry(
         PPLCZIncomingParcelsSensor(
             coordinator, entry, async_add_entities, current_barcodes
         ),
+        PPLCZAwaitingPickupSensor(coordinator, entry),
         PPLCZDeliveredParcelsSensor(coordinator, entry),
         PPLCZOutgoingParcelsSensor(coordinator, entry),
         PPLCZOutgoingDeliveredSensor(coordinator, entry),
@@ -169,6 +172,21 @@ class PPLCZIncomingParcelsSensor(_SummarySensor):
 
         self._known_barcodes = current_barcodes
         super()._handle_coordinator_update()
+
+
+class PPLCZAwaitingPickupSensor(_SummarySensor):
+    """Parcels that have arrived at a pickup point and are ready to collect."""
+
+    _attr_translation_key = "awaiting_pickup"
+    _unique_suffix = "awaiting_pickup"
+
+    def _parcels(self) -> list[dict]:
+        return [
+            parcel
+            for parcel in (self.coordinator.data or [])
+            if parcel.get("pickup")
+            and parcel.get("status") == ParcelStatus.AT_PICKUP_POINT
+        ]
 
 
 class PPLCZDeliveredParcelsSensor(_SummarySensor):

@@ -44,6 +44,7 @@ from .const import (
     DHL_API_KEY_HEADER,
     REGISTRATION_CONFIRM_URL,
     REGISTRATIONS_URL,
+    SHIPMENT_DELIVERY_INFO_URL,
     SHIPMENT_EVENTS_URL,
     SHIPMENTS_URL,
 )
@@ -389,6 +390,26 @@ class PPLCZApiClient:
         if not isinstance(events, list):
             return None
         return [event for event in events if isinstance(event, dict)]
+
+    async def async_get_delivery_info(self, shipment_id: str) -> dict[str, Any] | None:
+        """Return one shipment's ``deliveryInfo`` response, or ``None`` on failure.
+
+        The endpoint's existence is confirmed only from static analysis
+        (``carrier-research/ppl-cz/api/tracking.md``) — it has never been
+        called live, and its response shape (an ETA/delivery-window, per the
+        app's own naming) is completely unknown. Purely a research probe:
+        best-effort, never raises (a 404/error here is itself informative —
+        the endpoint may not exist for every shipment, or at all), and never
+        allowed to fail the whole poll the way an auth failure does.
+        """
+        url = SHIPMENT_DELIVERY_INFO_URL.format(shipment_id=shipment_id)
+        try:
+            payload = await self._authed_request("GET", url)
+        except PPLCZAuthError:
+            raise
+        except (PPLCZApiError, aiohttp.ClientError):
+            return None
+        return payload if isinstance(payload, dict) else None
 
 
 def _parse_expires_in(value: Any) -> int:

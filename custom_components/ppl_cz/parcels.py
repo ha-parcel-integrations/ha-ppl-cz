@@ -67,6 +67,7 @@ _unmapped_statuses_logged: set[str] = set()
 # once, on structure only, never on values).
 _items_shape_logged = False
 _events_shape_logged = False
+_delivery_info_shape_logged = False
 _delivery_point_type_logged = False
 _unknown_direction_logged: set[str] = set()
 
@@ -169,6 +170,31 @@ def note_events_shape(events: list[dict]) -> None:
         "PPL CZ returned a populated event history for the first time — "
         "this shape was reconstructed, not confirmed live. Please help us "
         "verify it (structure only, no values): %s\n  %s",
+        NEW_ISSUE_URL,
+        "; ".join(lines),
+    )
+
+
+def note_delivery_info_shape(payload: dict) -> None:
+    """One-shot: report a populated ``deliveryInfo`` response's shape.
+
+    This endpoint (``GET .../shipments/{id}/deliveryInfo``) was never called
+    live before this probe — its existence came from static analysis only,
+    and whether it actually carries a usable ETA/delivery window is an open
+    question this warning exists to close. See PPL CZ's CLAUDE.md "No ETA,
+    ever" note for why the integration otherwise has nothing to put in
+    `planned_from`/`planned_to`.
+    """
+    global _delivery_info_shape_logged
+    if _delivery_info_shape_logged or not payload:
+        return
+    _delivery_info_shape_logged = True
+    lines = _describe_shape(payload)
+    _LOGGER.warning(
+        "PPL CZ returned a populated deliveryInfo response for the first "
+        "time — this endpoint has never been seen live before and may carry "
+        "a real delivery ETA/window. Please help us verify it (structure "
+        "only, no values): %s\n  %s",
         NEW_ISSUE_URL,
         "; ".join(lines),
     )

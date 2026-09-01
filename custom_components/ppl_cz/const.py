@@ -64,6 +64,7 @@ REGISTRATIONS_URL = f"{API_BASE}/api/v1/registrations"
 REGISTRATION_CONFIRM_URL = f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
 SHIPMENTS_URL = f"{API_BASE}/api/v2/me/shipments?shipment_type=ALL"
 SHIPMENT_EVENTS_URL = f"{API_BASE}/api/v1/me/shipments/{{shipment_id}}/events"
+SHIPMENT_DELIVERY_INFO_URL = f"{API_BASE}/api/v1/me/shipments/{{shipment_id}}/deliveryInfo"
 
 # Every /mobapp call also carries this static, shared key — identical across
 # every install of the mojePPL app, not a per-user or per-device credential.

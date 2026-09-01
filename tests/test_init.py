@@ -35,6 +35,7 @@ def _client(items=None) -> MagicMock:
     client = MagicMock()
     client.async_get_parcels = AsyncMock(return_value=items or [])
     client.async_get_shipment_events = AsyncMock(return_value=None)
+    client.async_get_delivery_info = AsyncMock(return_value=None)
     return client
 
 

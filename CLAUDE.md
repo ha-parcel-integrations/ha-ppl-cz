@@ -202,6 +202,23 @@ replace the reconstruction in `tracking.md` with a real body once a real
 account/parcel is available, and correct anything these warnings surface
 along the way.
 
+**`deliveryInfo` research probe (2026-09-01) — logging only, never a data
+source.** `GET .../shipments/{id}/deliveryInfo` (per
+`carrier-research/ppl-cz/api/tracking.md`) was found by static analysis and
+never called live before this — its response shape, and even whether it
+answers at all, is completely unknown. Since the maintainer can't probe it
+by hand, `coordinator._probe_delivery_info` calls it once per shipment id
+(cached in `self._delivery_info_probed`, forever — not once per poll) for
+every *active* (not-yet-delivered) shipment, and `parcels.note_delivery_info_shape`
+fires the same one-shot structure-only `WARNING` pattern as
+`note_items_shape`/`note_events_shape` the first time a real call returns a
+populated body. Failures (404, error, unexpected shape) are silent — a 404
+here is itself the answer to an open question, not something to alarm the
+user about. **The result is never wired into `planned_from`/`planned_to`** —
+until a real response shape is confirmed there is nothing to map; see "No
+ETA, ever" above. If a real shape does come back, that is a build decision
+for a future session, not something to infer from the warning alone.
+
 **Multi-device is not gated.** The mechanics doc originally flagged whether
 an HA login could log out the phone app; the maintainer ruled it not
 applicable to this build (2026-08-22) before the repo was generated. No

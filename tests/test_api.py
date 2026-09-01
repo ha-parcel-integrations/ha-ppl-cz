@@ -16,6 +16,7 @@ from custom_components.ppl_cz.const import (
     AZURE_TOKEN_URL,
     REGISTRATION_CONFIRM_URL,
     REGISTRATIONS_URL,
+    SHIPMENT_DELIVERY_INFO_URL,
     SHIPMENT_EVENTS_URL,
     SHIPMENTS_URL,
 )
@@ -31,6 +32,7 @@ from .payloads import (
 
 CONFIRM_URL = REGISTRATION_CONFIRM_URL.format(registration_session_id="reg-session-1")
 EVENTS_URL = SHIPMENT_EVENTS_URL.format(shipment_id="id-1")
+DELIVERY_INFO_URL = SHIPMENT_DELIVERY_INFO_URL.format(shipment_id="id-1")
 
 EMPTY_BODY = object()  # a 200 with a zero-byte body, the stale-connection symptom
 HTML_ERROR_PAGE = object()  # a 200 with an Azure B2C outage page instead of JSON
@@ -522,3 +524,52 @@ async def test_get_shipment_events_auth_error_propagates():
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_shipment_events("id-1")
+
+
+# --- deliveryInfo (research probe, endpoint never confirmed live) ------------
+
+
+async def test_get_delivery_info_returns_populated_dict():
+    body = {"deliveryWindowFrom": "2026-09-01T09:00:00Z"}
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", DELIVERY_INFO_URL): [(200, body)],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    assert await client.async_get_delivery_info("id-1") == body
+
+
+async def test_get_delivery_info_unexpected_shape_returns_none():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", DELIVERY_INFO_URL): [(200, "nope")],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    assert await client.async_get_delivery_info("id-1") is None
+
+
+async def test_get_delivery_info_404_returns_none():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
+            ("get", DELIVERY_INFO_URL): [(404, {})],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    assert await client.async_get_delivery_info("id-1") is None
+
+
+async def test_get_delivery_info_auth_error_propagates():
+    session = _Session(
+        {
+            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
+            ("get", DELIVERY_INFO_URL): [(401, {}), (401, {})],
+        }
+    )
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    with pytest.raises(PPLCZAuthError):
+        await client.async_get_delivery_info("id-1")

@@ -21,6 +21,7 @@ from custom_components.ppl_cz.parcels import (
     map_event_status,
     map_parcel_status,
     normalize_parcel,
+    note_delivery_info_shape,
     note_events_shape,
     note_items_shape,
     parse_iso,
@@ -176,6 +177,16 @@ def test_note_events_shape_fires_once_on_populated_list(caplog):
     note_events_shape(events_for_delivered())
     note_events_shape(events_for_delivered())
     assert caplog.text.count("event history") == 1
+
+
+def test_note_delivery_info_shape_fires_once_on_populated_response(caplog):
+    parcels_mod._delivery_info_shape_logged = False
+    note_delivery_info_shape({})  # empty -> no warning
+    assert "deliveryInfo" not in caplog.text
+    note_delivery_info_shape({"deliveryWindowFrom": "2026-09-01T09:00:00Z"})
+    note_delivery_info_shape({"deliveryWindowFrom": "2026-09-01T09:00:00Z"})
+    assert caplog.text.count("deliveryInfo") == 1
+    assert "deliveryWindowFrom: str" in caplog.text
 
 
 def test_delivery_point_type_warns_once(caplog):

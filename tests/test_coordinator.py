@@ -65,6 +65,7 @@ def _client(items, events_by_id=None) -> AsyncMock:
     client.async_get_parcels.return_value = items
     events_by_id = events_by_id or {}
     client.async_get_shipment_events.side_effect = lambda sid: events_by_id.get(sid)
+    client.async_get_delivery_info.return_value = None
     return client
 
 
@@ -159,6 +160,46 @@ async def test_history_call_failure_keeps_cached_history(hass):
     client.async_get_shipment_events.side_effect = lambda sid: None
     data = await coord._async_update_data()
     assert data[0]["history"] is not None
+
+
+async def test_delivery_info_probed_once_per_shipment(hass):
+    """Research probe: called once per shipment id, cached across polls."""
+    entry = _entry()
+    entry.add_to_hass(hass)
+    client = _client([incoming_shipment(IN, status="IN_TRANSPORT")])
+    client.async_get_delivery_info.return_value = None
+    coord = PPLCZCoordinator(hass, client, entry)
+
+    await coord._async_update_data()
+    await coord._async_update_data()  # same shipment id -> no re-probe
+
+    assert client.async_get_delivery_info.await_count == 1
+
+
+async def test_delivery_info_not_probed_for_delivered_parcels(hass):
+    entry = _entry()
+    entry.add_to_hass(hass)
+    client = _client([incoming_shipment(IN, status="DELIVERED")])
+    coord = PPLCZCoordinator(hass, client, entry)
+
+    await coord._async_update_data()
+
+    client.async_get_delivery_info.assert_not_awaited()
+
+
+async def test_delivery_info_populated_response_warns_once(hass, caplog):
+    entry = _entry()
+    entry.add_to_hass(hass)
+    client = _client([incoming_shipment(IN, status="IN_TRANSPORT")])
+    client.async_get_delivery_info.return_value = {
+        "deliveryWindowFrom": "2026-09-01T09:00:00Z"
+    }
+    coord = PPLCZCoordinator(hass, client, entry)
+
+    await coord._async_update_data()
+
+    assert "deliveryInfo" in caplog.text
+    assert "deliveryWindowFrom: str" in caplog.text
 
 
 async def test_auth_error_becomes_config_entry_auth_failed(hass):

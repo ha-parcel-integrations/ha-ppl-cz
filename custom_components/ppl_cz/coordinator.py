@@ -39,6 +39,7 @@ from .parcels import (
     apply_delivered_filter,
     build_history,
     normalize_parcel,
+    note_delivery_info_shape,
     note_events_shape,
     note_items_shape,
     shipment_direction,
@@ -172,6 +173,12 @@ class PPLCZCoordinator(DataUpdateCoordinator[list[dict]]):
         # refetched only when the shipment's coarse status changed since the
         # last poll, mirroring DHL NL's track-trace cache.
         self._history_cache: dict[str, tuple[str | None, list[dict]]] = {}
+        # Shipment ids already probed against the unconfirmed deliveryInfo
+        # endpoint (see _probe_delivery_info) — probed once per shipment,
+        # ever, not once per poll: it exists purely to catch a real ETA
+        # payload's shape, not to serve `planned_from`, so there is nothing
+        # to gain from re-probing an id that already answered (even a 404).
+        self._delivery_info_probed: set[str] = set()
         self._cached_device_id: str | None = None
         self.last_success_time: datetime | None = None
         # Tier last computed by _hottest_tier_minutes when the refresh
@@ -226,6 +233,8 @@ class PPLCZCoordinator(DataUpdateCoordinator[list[dict]]):
                 if barcode:
                     barcodes_seen.add(barcode)
                 parcel = normalize_parcel(raw, history=history)
+                if not parcel["delivered"]:
+                    await self._probe_delivery_info(raw)
                 if shipment_direction(raw) == DIRECTION_OUTGOING:
                     outgoing.append(parcel)
                 else:
@@ -286,6 +295,25 @@ class PPLCZCoordinator(DataUpdateCoordinator[list[dict]]):
             self.update_interval = timedelta(minutes=int(setting))
 
         return normalized_active
+
+    async def _probe_delivery_info(self, raw: dict) -> None:
+        """Probe the unconfirmed deliveryInfo endpoint once per shipment.
+
+        Purely a research probe (see api.py's docstring on
+        ``async_get_delivery_info``) — the result is never used for
+        `planned_from`/`planned_to`, only logged once via
+        :func:`note_delivery_info_shape` the first time a real response
+        comes back populated. Best-effort and silent on failure: a 404 here
+        is itself the answer to an open question, not an error worth
+        surfacing to the user.
+        """
+        shipment_id = raw.get("id")
+        if not shipment_id or shipment_id in self._delivery_info_probed:
+            return
+        self._delivery_info_probed.add(shipment_id)
+        payload = await self._client.async_get_delivery_info(shipment_id)
+        if payload:
+            note_delivery_info_shape(payload)
 
     async def _history_for(self, raw: dict, barcode: str) -> list[dict] | None:
         """Return the cached/fresh canonical history for one shipment.

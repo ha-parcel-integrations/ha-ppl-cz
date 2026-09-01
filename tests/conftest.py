@@ -26,6 +26,7 @@ def reset_one_shot_warnings():
     parcels._unmapped_statuses_logged.clear()
     parcels._items_shape_logged = False
     parcels._events_shape_logged = False
+    parcels._delivery_info_shape_logged = False
     parcels._delivery_point_type_logged = False
     parcels._unknown_direction_logged.clear()
     yield

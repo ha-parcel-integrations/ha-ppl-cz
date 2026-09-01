@@ -63,7 +63,7 @@
               "refresh_interval": "Aktualizovat každých"
             },
             "data_description": {
-              "refresh_interval": "Jak často integrace kontroluje PPL CZ ohledně změn zásilek. Delší interval je šetrnější k API PPL CZ; výchozích 30 minut stačí pro většinu zásilek."
+              "refresh_interval": "Jak často integrace kontroluje PPL CZ ohledně změn zásilek. „Automaticky“ (výchozí u nových instalací) zrychlí kontroly kolem očekávaného doručení a zpomalí je přes noc; pevný interval místo toho kontroluje stálou rychlostí po celý den."
             }
           }
         }
@@ -73,6 +73,7 @@
   "selector": {
     "refresh_interval": {
       "options": {
+        "auto": "Automaticky (doporučeno)",
         "15": "15 minut",
         "30": "30 minut",
         "60": "60 minut",

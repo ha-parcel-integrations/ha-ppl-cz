@@ -63,7 +63,7 @@
               "refresh_interval": "Ververs elke"
             },
             "data_description": {
-              "refresh_interval": "Hoe vaak de integratie PPL CZ controleert op pakketwijzigingen. Een langer interval is milder voor de API van PPL CZ; de standaard van 30 minuten volstaat voor de meeste pakketten."
+              "refresh_interval": "Hoe vaak de integratie PPL CZ controleert op pakketwijzigingen. \"Automatisch\" (de standaard voor nieuwe installaties) versnelt rond een verwachte bezorging en vertraagt 's nachts; een vast interval controleert in plaats daarvan de klok rond met een constante snelheid."
             }
           }
         }
@@ -73,6 +73,7 @@
   "selector": {
     "refresh_interval": {
       "options": {
+        "auto": "Automatisch (aanbevolen)",
         "15": "15 minuten",
         "30": "30 minuten",
         "60": "60 minuten",

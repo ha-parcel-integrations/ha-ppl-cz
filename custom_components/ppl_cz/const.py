@@ -58,7 +58,7 @@ CAPABILITIES = frozenset({"pickup_point", "url", "history"})
 # itself does. There is no refresh-token step: PPL's B2C tenant hard-revokes
 # the whole token lineage ~1h after the original login regardless of
 # intervening refreshes, and the app never sends grant_type=refresh_token at
-# all (see carrier-research/ppl-cz/api/login.md).
+# all.
 API_BASE = "https://api.dhl.com/ecs/ppl/mobapp"
 REGISTRATIONS_URL = f"{API_BASE}/api/v1/registrations"
 REGISTRATION_CONFIRM_URL = f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
@@ -128,9 +128,8 @@ DEFAULT_REFRESH_INTERVAL = 30  # minutes — default for entries that predate "a
 # existing entry keeps whatever it already has, numeric or "auto".
 DEFAULT_NEW_REFRESH_INTERVAL = REFRESH_INTERVAL_AUTO
 
-# Dynamic, status-driven polling — selected via "auto" above. See
-# carrier-research/dynamic-polling.md for the full algorithm and reasoning
-# (account-based model, Section 2.2). PPL CZ's list DTOs carry no ETA at all
+# Dynamic, status-driven polling — selected via "auto" above. PPL CZ's
+# list DTOs carry no ETA at all
 # (see CAPABILITIES above), so the "1h before planned_from" lookahead never
 # has a value to compare against — an out_for_delivery parcel always jumps
 # straight to the hot tier here, the same "planned_from always None" shape

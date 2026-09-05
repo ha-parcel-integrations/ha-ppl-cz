@@ -20,8 +20,7 @@ a refresh token. PPL's B2C tenant hard-revokes the whole refresh-token
 lineage ~1h after the original login regardless of how many successful
 refreshes happened in between, and the app itself never sends
 ``grant_type=refresh_token`` at all — it re-runs the password grant from a
-stored credential whenever a request 401s (see
-``carrier-research/ppl-cz/api/login.md``). This client mirrors that: a stale
+stored credential whenever a request 401s. This client mirrors that: a stale
 or rejected access token is renewed by re-running :meth:`async_exchange_password`
 (:meth:`_async_ensure_fresh_token`), not by refreshing. A failed re-mint
 raises :class:`PPLCZAuthError`, which the coordinator maps to reauth.
@@ -394,9 +393,8 @@ class PPLCZApiClient:
     async def async_get_delivery_info(self, shipment_id: str) -> dict[str, Any] | None:
         """Return one shipment's ``deliveryInfo`` response, or ``None`` on failure.
 
-        The endpoint's existence is confirmed only from static analysis
-        (``carrier-research/ppl-cz/api/tracking.md``) — it has never been
-        called live, and its response shape (an ETA/delivery-window, per the
+        The endpoint's existence is confirmed only from static analysis —
+        it has never been called live, and its response shape (an ETA/delivery-window, per the
         app's own naming) is completely unknown. Purely a research probe:
         best-effort, never raises (a 404/error here is itself informative —
         the endpoint may not exist for every shipment, or at all), and never

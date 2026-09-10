@@ -24,6 +24,12 @@ you act in one of these areas:
 | consider "fixing" a lint/pattern the skill flags (poll interval, inline client, sync requests) | *Deliberate skill divergences* — likely intentional, don't re-flag |
 | commit, bump, tag, release, or write release notes; add a feature without a test | *Workflow / Commits / Versioning / Testing* |
 
+**Structure, options flow, dynamic polling and module layout are suite-wide**
+and identical in every carrier — the authoritative spec is
+[`ha-carrier-template/scaffold/CLAUDE.md`](https://github.com/ha-parcel-integrations/ha-carrier-template/blob/main/scaffold/CLAUDE.md).
+Where this repo diverges from it, that is recorded below under
+*Divergences from the scaffold*.
+
 **Suite-wide tripwires, kept inline on purpose:**
 - **First refresh in `__init__.py`, before `async_forward_entry_setups`** — from
   a forwarded platform HA can't catch `ConfigEntryNotReady` and half-sets-up the
@@ -233,65 +239,24 @@ without a real browser; anything under `/api/v1/me/profiles`,
 `/title`, `/archive` — user-profile edits, payments and ratings, none of it
 a parcel field.
 
-## Options and reloads — account-based model
+## Divergences from the scaffold
 
-The options flow is one sectioned form (`data_entry_flow.section`).
-**Account-based**, so it calls `async_schedule_reload` on submit and
-registers **no** update listener (combining a listener with a
-reload-on-update flow is deprecated, an error in HA 2026.12+).
+Everything not listed here follows the scaffold exactly.
 
-The user-tunable poll interval is a deliberate HACS divergence (see
-CONVENTIONS.md). `CONF_REFRESH_INTERVAL` = 15/30/60/120/240 min, default 30,
-plus `"auto"` (dynamic, status-driven polling — see below). New config
-entries default to `"auto"`; an entry created before this option existed
-keeps its numeric value untouched.
+*Options and reloads* — account-based, so `async_schedule_reload` on submit
+with **no** update listener. Unlike the scaffold's no-interval model this
+carrier exposes `CONF_REFRESH_INTERVAL` = 15/30/60/120/240 min (default 30)
+plus `"auto"`; new entries default to `"auto"`, pre-existing entries keep their
+numeric value. Do not build a Phase 2 (making `auto` unconditional) without a
+separate maintainer decision.
 
-**Dynamic polling (Phase 1 of `carrier-research/dynamic-polling.md`,
-account-based model, Section 2.2)** — `"auto"` is one more selectable
-`CONF_REFRESH_INTERVAL` value, not a replacement for the numeric options.
-When selected, the coordinator recomputes `update_interval` at the end of
-every `_async_update_data`: a 15 min hot tier the moment any active
-incoming *or* outgoing parcel is `out_for_delivery` (starting 1h before
-`planned_from`, or immediately if missing), a 45 min mid tier otherwise —
-which never stops, since the account call is the only way to discover a new
-shipment that appears without going through this integration — and a
-00:00–06:00 local-time quiet window with anchor polls at each end, plus a
-small deterministic per-`entry_id` stagger. `problem`/`returning` stay in
-the mid tier, not hot. **PPL CZ's DTOs carry no ETA at all** (see the "No
-ETA, ever" note above), so `planned_from` is always `None` — every
-`out_for_delivery` parcel takes the "no `planned_from`" branch straight to
-the hot tier; the 1h-lookahead branch is architecturally unreachable from
-real PPL CZ data, the same situation ha-quickpac/ha-sameday/ha-sunyou hit on
-their own conversions. Surfaced in diagnostics under `"polling"`
-(`current_tier_minutes`, `update_interval_seconds`). Do not build a Phase 2
-(making `auto` unconditional / dropping the dropdown) without a separate
-maintainer decision — that is explicitly out of scope for this rollout.
-
-## Module layout
-
-| File | Carrier-specific? |
-|---|---|
-| `api.py` (login/refresh/shipments/events, error types, token refresh) | **yes** |
-| `const.py` (domain, endpoints, `ParcelStatus`, option keys) | partly (endpoints) |
-| `parcels.py` (status map, `normalize_parcel`, direction split, history, sort, filters — pure, no I/O) | partly (`_STATUS_MAP`, `normalize_parcel`, `shipment_direction`) |
-| `coordinator.py` (fetch, split, history fan-out cache, event firing) | mostly not |
-| `config_flow.py` (2-step e-mail+PIN login, reauth, options) | partly |
-| `__init__.py` (client setup, token persistence, first refresh) | mostly not |
-| `sensor.py` / `button.py` / `device_trigger.py` | no |
-| `diagnostics.py` | partly (`TO_REDACT`) |
-
-No `services.py` and no `calendar.py` — the account auto-imports parcels and
-there is no ETA to put on a calendar. `parcels.py` is deliberately free of
-I/O and HA objects so the per-carrier part stays unit-testable without Home
-Assistant. Config: `ConfigEntry.runtime_data` (typed, no `hass.data`),
-`PARALLEL_UPDATES = 0`, coordinator takes `config_entry=entry`. The
-coordinator maps `PPLCZAuthError` → `ConfigEntryAuthFailed` and
-`PPLCZApiError` → `UpdateFailed`; `aiohttp.ClientError` is not caught around
-the whole update (the coordinator wraps that), but per-parcel events calls
-are best-effort inside `api.py`/`coordinator._history_for`. Entities:
-`has_entity_name` + `translation_key`, `icons.json`, translated units,
-`_attr_attribution`, `_unrecorded_attributes` on anything with a parcel list
-or `raw`. Over-redact diagnostics — they get pasted into public issues.
+*Dynamic polling* — **PPL CZ's DTOs carry no ETA at all** (see "No ETA, ever"
+above), so `planned_from` is always `None`: every `out_for_delivery` parcel
+takes the "no `planned_from`" branch straight to the hot tier, and the
+1h-lookahead branch is architecturally unreachable from real data — the same
+situation `ha-quickpac`/`ha-sameday`/`ha-sunyou` hit. The tier is surfaced in
+diagnostics under `"polling"` (`current_tier_minutes`,
+`update_interval_seconds`), recomputed at the end of every `_async_update_data`.
 
 ## Running tests
 

@@ -39,16 +39,11 @@ from .const import (
     CONF_DELIVERED_FILTER_AMOUNT,
     CONF_DELIVERED_FILTER_TYPE,
     CONF_INCLUDE_HISTORY,
-    CONF_REFRESH_INTERVAL,
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_DELIVERED_FILTER_AMOUNT,
     DEFAULT_DELIVERED_FILTER_TYPE,
     DEFAULT_INCLUDE_HISTORY,
-    DEFAULT_NEW_REFRESH_INTERVAL,
-    DEFAULT_REFRESH_INTERVAL,
     DOMAIN,
-    REFRESH_INTERVAL_AUTO,
-    REFRESH_INTERVAL_OPTIONS,
 )
 from .session import async_create_ppl_session
 
@@ -56,18 +51,6 @@ _LOGGER = logging.getLogger(__name__)
 
 _EMAIL_SCHEMA = vol.Schema({vol.Required(CONF_EMAIL): str})
 _PIN_SCHEMA = vol.Schema({vol.Required("pin"): str})
-
-
-def _interval_selector() -> selector.SelectSelector:
-    """Return the refresh-interval dropdown selector (options translated via strings)."""
-    return selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=[REFRESH_INTERVAL_AUTO]
-            + [str(minutes) for minutes in REFRESH_INTERVAL_OPTIONS],
-            translation_key=CONF_REFRESH_INTERVAL,
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        )
-    )
 
 
 class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -162,11 +145,6 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
                     options={
                         CONF_DELIVERED_FILTER_TYPE: DEFAULT_DELIVERED_FILTER_TYPE,
                         CONF_DELIVERED_FILTER_AMOUNT: DEFAULT_DELIVERED_FILTER_AMOUNT,
-                        # New installs default to dynamic polling; an entry
-                        # set up before this option existed keeps reading
-                        # DEFAULT_REFRESH_INTERVAL via the coordinator's
-                        # .get() fallback instead (Section 5.2).
-                        CONF_REFRESH_INTERVAL: DEFAULT_NEW_REFRESH_INTERVAL,
                         CONF_INCLUDE_HISTORY: DEFAULT_INCLUDE_HISTORY,
                     },
                 )
@@ -212,7 +190,11 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class PPLCZOptionsFlowHandler(OptionsFlow):
-    """Manage delivered retention, history and polling in one sectioned form."""
+    """Manage delivered retention and history in one sectioned form.
+
+    Polling cadence is not configurable — the coordinator drives it from
+    what the tracked parcels are doing.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -221,8 +203,7 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             delivered = user_input["delivered"]
             history = user_input["history"]
-            polling = user_input["polling"]
-            # Reload so a changed interval takes effect immediately. No update
+            # Reload so a changed option takes effect immediately. No update
             # listener is registered — combining the two is deprecated.
             self.hass.config_entries.async_schedule_reload(
                 self.config_entry.entry_id
@@ -235,11 +216,6 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
                         delivered[CONF_DELIVERED_FILTER_AMOUNT]
                     ),
                     CONF_INCLUDE_HISTORY: bool(history[CONF_INCLUDE_HISTORY]),
-                    CONF_REFRESH_INTERVAL: (
-                        REFRESH_INTERVAL_AUTO
-                        if polling[CONF_REFRESH_INTERVAL] == REFRESH_INTERVAL_AUTO
-                        else int(polling[CONF_REFRESH_INTERVAL])
-                    ),
                 },
             )
 
@@ -289,24 +265,6 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
                                     CONF_INCLUDE_HISTORY, DEFAULT_INCLUDE_HISTORY
                                 ),
                             ): selector.BooleanSelector(),
-                        }
-                    ),
-                    {"collapsed": True},
-                ),
-                vol.Required("polling"): section(
-                    vol.Schema(
-                        {
-                            vol.Required(
-                                CONF_REFRESH_INTERVAL,
-                                # str(): selector option values are strings, so
-                                # a stored int default trips "expected str".
-                                default=str(
-                                    current.get(
-                                        CONF_REFRESH_INTERVAL,
-                                        DEFAULT_REFRESH_INTERVAL,
-                                    )
-                                ),
-                            ): _interval_selector(),
                         }
                     ),
                     {"collapsed": True},

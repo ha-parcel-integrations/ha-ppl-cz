@@ -112,23 +112,9 @@ CONF_DELIVERED_FILTER_AMOUNT = "delivered_filter_amount"
 DEFAULT_DELIVERED_FILTER_TYPE = "days"
 DEFAULT_DELIVERED_FILTER_AMOUNT = 7
 
-# Refresh interval (minutes) controls how often the coordinator polls the
-# carrier. No rate limiting was observed in the (static + one live login)
-# analysis, but polling itself was never exercised live — treat 30 min as a
-# starting assumption, not a settled fact.
-#
-# Deliberate divergence from the HA Core rule that polling intervals are not
-# user-configurable: that rule targets core integrations, and in a HACS parcel
-# tracker a tunable cadence is a wanted feature.
-CONF_REFRESH_INTERVAL = "refresh_interval"
-REFRESH_INTERVAL_AUTO = "auto"
-REFRESH_INTERVAL_OPTIONS = (15, 30, 60, 120, 240)
-DEFAULT_REFRESH_INTERVAL = 30  # minutes — default for entries that predate "auto"
-# New config entries default to "auto" (dynamic-polling rollout, Phase 1); an
-# existing entry keeps whatever it already has, numeric or "auto".
-DEFAULT_NEW_REFRESH_INTERVAL = REFRESH_INTERVAL_AUTO
-
-# Dynamic, status-driven polling — selected via "auto" above. PPL CZ's
+# Dynamic, status-driven polling — unconditional, no user-facing interval
+# option. No rate limiting was observed in the (static + one live login)
+# analysis, but polling itself was never exercised live. PPL CZ's
 # list DTOs carry no ETA at all
 # (see CAPABILITIES above), so the "1h before planned_from" lookahead never
 # has a value to compare against — an out_for_delivery parcel always jumps

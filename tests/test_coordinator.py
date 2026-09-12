@@ -343,7 +343,7 @@ async def test_shipment_without_number_is_skipped_from_history_but_still_normali
 
 
 # ---------------------------------------------------------------------------
-# Dynamic polling (dynamic-polling.md Section 2.2, account-based) — pure
+# Dynamic polling (account-based) — pure
 # helpers
 # ---------------------------------------------------------------------------
 

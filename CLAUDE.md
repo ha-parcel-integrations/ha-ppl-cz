@@ -234,11 +234,40 @@ until a real response shape is confirmed there is nothing to map; see "No
 ETA, ever" above. If a real shape does come back, that is a build decision
 for a future session, not something to infer from the warning alone.
 
-**Multi-device is not gated.** The mechanics doc originally flagged whether
-an HA login could log out the phone app; the maintainer ruled it not
-applicable to this build (2026-08-22) before the repo was generated. No
-warning, no config-flow caveat for it — nothing in this repo treats that as
-an open question.
+**One credential per account — an app login and this integration evict each
+other (2026-09-22, reverses the 2026-08-22 ruling).** The mechanics doc
+originally flagged whether an HA login could log out the phone app; that was
+ruled not applicable before the repo was generated, and
+[issue #4](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/4)
+proved it wrong. A fourth APK teardown pass settled it: the ROPC grant's
+`username` is the plain e-mail address, never the device, so the account has
+exactly **one** Azure credential; and the app mints a fresh one for that same
+identity on every login (its confirm-step DTO is literally named
+`CreatedUserResponseDto`), generating throwaway random UUIDs for `deviceId`
+and `registrationSessionId` each time exactly as `config_flow.py` does. So a
+mojePPL app login rotates the password stored here out from under us, and a
+setup/reauth here does the same to the phone. **This is not fixable** — the
+PIN arrives by e-mail, so reconnecting is inherently manual. It is disclosed
+instead, in the `user` and `reauth_confirm` step descriptions and the README.
+Don't re-add a "multi-device is fine" claim anywhere.
+
+Note this is a *different* failure from the ~60-minute lineage revocation
+above: rotation kills the credential the instant someone logs in elsewhere,
+with no timeout involved. Issue #1's live test only ever proved that two
+sessions can *poll* concurrently, which is still true — it never re-logged-in
+on the app, so it never exercised this.
+
+**Only `access_denied`/`invalid_grant` on a 400 mean reauth.** The token
+endpoint's other 400s are Azure failing, not the credential being rejected,
+and reauth would send the user after a PIN that fixes nothing — so
+`AZURE_CREDENTIAL_REJECTED_ERRORS` gates which ones become `PPLCZAuthError`;
+everything else (including a 400 whose body won't parse) is a plain
+`PPLCZApiError` and gets retried. The app draws the same line, logging out on
+`access_denied` and on nothing else. 401/403 stay unconditional auth errors.
+The rejection log line is a **WARNING, not DEBUG** — it ends in a reauth
+prompt either way, and Azure's `error`/`error_description` are the only thing
+that tells a rotated password apart from a revoked one in an issue report.
+Neither field carries user PII.
 
 **Do not build:** the website tracking-by-number surface
 (`ppl.cz/vyhledat-zasilku` → `api.dhl.com/ecs/ppl/webapi/TrackAndTrace`) — a

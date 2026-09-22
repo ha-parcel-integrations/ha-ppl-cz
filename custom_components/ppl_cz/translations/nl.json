@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "PPL CZ instellen",
-        "description": "Voer het e-mailadres van je mojePPL-account in. PPL CZ stuurt een pincode naar dat adres.",
+        "description": "Voer het e-mailadres van je mojePPL-account in. PPL CZ stuurt een pincode naar dat adres.\n\nEen mojePPL-account heeft één aanmelding: dit instellen meldt de mobiele app af, en als je later in de app aanmeldt verliest Home Assistant de verbinding tot je hier opnieuw koppelt.",
         "data": {
           "email": "E-mailadres"
         }
@@ -18,7 +18,7 @@
       },
       "reauth_confirm": {
         "title": "PPL CZ-aanmelding verlopen",
-        "description": "PPL CZ accepteert de opgeslagen sessie voor {email} niet meer. Vraag een nieuwe pincode aan om opnieuw aan te melden."
+        "description": "PPL CZ accepteert de opgeslagen aanmelding voor {email} niet meer. Meestal is er elders aangemeld — aanmelden in de mojePPL-app vervangt het wachtwoord dat Home Assistant had opgeslagen. Vraag een nieuwe pincode aan om opnieuw te koppelen."
       }
     },
     "error": {

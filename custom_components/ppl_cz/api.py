@@ -22,8 +22,13 @@ refreshes happened in between, and the app itself never sends
 ``grant_type=refresh_token`` at all — it re-runs the password grant from a
 stored credential whenever a request 401s. This client mirrors that: a stale
 or rejected access token is renewed by re-running :meth:`async_exchange_password`
-(:meth:`_async_ensure_fresh_token`), not by refreshing. A failed re-mint
-raises :class:`PPLCZAuthError`, which the coordinator maps to reauth.
+(:meth:`_async_ensure_fresh_token`), not by refreshing. A re-mint that Azure
+rejects raises :class:`PPLCZAuthError`, which the coordinator maps to reauth;
+a re-mint that merely fails does not, since reauth would fix nothing.
+
+That stored password belongs to the account, not to this install — step 2
+mints a new one for the same identity whenever anyone logs in, so signing in
+to the mobile app invalidates the one kept here, and vice versa.
 """
 from __future__ import annotations
 
@@ -37,6 +42,7 @@ import aiohttp
 
 from .const import (
     AZURE_CLIENT_ID,
+    AZURE_CREDENTIAL_REJECTED_ERRORS,
     AZURE_SCOPE,
     AZURE_TOKEN_URL,
     DHL_API_KEY,
@@ -227,16 +233,37 @@ class PPLCZApiClient:
             },
         ) as response:
             if response.status in (400, 401, 403):
+                body = await _azure_error_body(response)
+                error = body.get("error")
+                if (
+                    response.status == 400
+                    and error not in AZURE_CREDENTIAL_REJECTED_ERRORS
+                ):
+                    # Not a rejection of the credential, so reauth would only
+                    # send the user after a PIN that fixes nothing.
+                    _LOGGER.debug(
+                        "PPL CZ token exchange failed (HTTP 400): %s",
+                        _format_azure_error(body),
+                    )
+                    raise PPLCZApiError(
+                        f"token exchange HTTP 400 ({error or 'no error code'})"
+                    )
                 # Either the one-time PIN-exchange password was rejected
                 # (first login) or a previously-good stored password no
-                # longer works (re-mint) — either way the email+PIN
-                # round-trip has to run again, not a plain connectivity
-                # blip. Azure's own error/error_description explain why and
-                # carry no user PII, so log them at DEBUG.
-                _LOGGER.debug(
-                    "PPL CZ token exchange rejected (HTTP %s): %s",
+                # longer works — most often because a login elsewhere on the
+                # same account replaced it. Either way the email+PIN
+                # round-trip has to run again. Azure's own
+                # error/error_description say which, and carry no user PII,
+                # so surface them: this ends in a reauth prompt, and the code
+                # is the only thing that tells a rotated password apart from
+                # a revoked one in an issue report.
+                _LOGGER.warning(
+                    "PPL CZ rejected the stored sign-in (HTTP %s): %s. "
+                    "Signing in to the mojePPL app replaces the password this "
+                    "integration stores, so Home Assistant has to be "
+                    "reconnected after you do",
                     response.status,
-                    await _azure_error(response),
+                    _format_azure_error(body),
                 )
                 raise PPLCZAuthError(f"token exchange HTTP {response.status}")
             if response.status != 200:
@@ -448,16 +475,22 @@ async def _json(response: aiohttp.ClientResponse) -> Any:
         raise PPLCZApiError(f"unparseable body ({err})") from err
 
 
-async def _azure_error(response: aiohttp.ClientResponse) -> str:
-    """Best-effort ``error``/``error_description`` from a rejected Azure B2C response.
+async def _azure_error_body(response: aiohttp.ClientResponse) -> dict[str, Any]:
+    """Best-effort JSON body from a rejected Azure B2C response.
 
-    For the debug log. Never raises, since this only runs on a path that is
-    already about to raise its own error.
+    Never raises, since this only runs on a path that is already about to
+    raise its own error; an unreadable body yields an empty mapping, which
+    reads as "no error code" to the caller.
     """
     try:
         body = await response.json(content_type=None)
     except ValueError:
-        return "<unparseable body>"
-    if not isinstance(body, dict):
-        return "<non-object body>"
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+def _format_azure_error(body: dict[str, Any]) -> str:
+    """Render :func:`_azure_error_body`'s result for a log line."""
+    if not body:
+        return "<no readable error body>"
     return f"{body.get('error')}: {body.get('error_description')}"

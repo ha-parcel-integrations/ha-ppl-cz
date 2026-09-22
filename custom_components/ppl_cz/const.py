@@ -59,6 +59,13 @@ CAPABILITIES = frozenset({"pickup_point", "url", "history"})
 # the whole token lineage ~1h after the original login regardless of
 # intervening refreshes, and the app never sends grant_type=refresh_token at
 # all.
+#
+# The password is the account's single credential, not this device's: the ROPC
+# grant's username is the plain e-mail address, and step 2 mints a fresh
+# password for that one identity every time anyone runs the login. So a login
+# in the mobile app rotates the password stored here out from under us (and a
+# login here does the same to the app) — see CLAUDE.md, "One credential per
+# account".
 API_BASE = "https://api.dhl.com/ecs/ppl/mobapp"
 REGISTRATIONS_URL = f"{API_BASE}/api/v1/registrations"
 REGISTRATION_CONFIRM_URL = f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
@@ -84,6 +91,12 @@ AZURE_TOKEN_URL = (
 )
 AZURE_CLIENT_ID = "e8286178-1efe-4e0a-8cb8-98f126391a3c"
 AZURE_SCOPE = f"openid {AZURE_CLIENT_ID} offline_access"
+
+# The only two `error` values on a 400 that mean "this credential is dead" and
+# so justify dragging the user through reauth. Any other 400 is something
+# else going wrong at Azure's end and gets retried instead — the mojePPL app
+# draws the same line, logging out on access_denied and on nothing else.
+AZURE_CREDENTIAL_REJECTED_ERRORS = frozenset({"access_denied", "invalid_grant"})
 
 # Human-facing deep link surfaced on each parcel's `url` field. Not fetched by
 # this integration — the page itself needs a per-request reCAPTCHA v3 token

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Nastavit PPL CZ",
-        "description": "Zadejte e-mailovou adresu svého účtu mojePPL. PPL CZ na ni pošle PIN.",
+        "description": "Zadejte e-mailovou adresu svého účtu mojePPL. PPL CZ na ni pošle PIN.\n\nÚčet mojePPL má jen jedno přihlášení: tímto nastavením se odhlásí mobilní aplikace a pozdější přihlášení v aplikaci odpojí Home Assistant, dokud ho zde znovu nepropojíte.",
         "data": {
           "email": "E-mailová adresa"
         }
@@ -18,7 +18,7 @@
       },
       "reauth_confirm": {
         "title": "Přihlášení k PPL CZ vypršelo",
-        "description": "PPL CZ již neakceptuje uloženou relaci pro {email}. Vyžádejte si nový PIN pro opětovné přihlášení."
+        "description": "PPL CZ již neakceptuje uložené přihlášení pro {email}. Obvykle to znamená, že se účet přihlásil jinde — přihlášení v aplikaci mojePPL nahradí heslo, které měl uložené Home Assistant. Vyžádejte si nový PIN a propojte ho znovu."
       }
     },
     "error": {

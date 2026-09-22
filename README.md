@@ -46,7 +46,7 @@ Part of the [ha-parcel-integrations](https://ha-parcel-integrations.github.io/) 
 
 - **Automatic import** of every parcel on your mojePPL account — no manual tracking numbers
 - **Both directions**: parcels you're receiving (incoming) and parcels you sent (outgoing), each with its own sensors
-- **Passwordless login**: sign in with your e-mail and a one-time PIN — no password stored
+- **Passwordless login**: sign in with your e-mail and a one-time PIN — no password stored (one sign-in per account, see [Configuration](#configuration))
 - Per-parcel sensor with the canonical status (`registered` / `in_transit` / `at_pickup_point` / `delivered` / …), PPL CZ's own status text, and a tracking deep-link
 - Summary sensors: incoming, outgoing, and recently delivered (both directions)
 - Events + device triggers for no-code automations (parcel registered / status changed / delivered, incoming and outgoing)
@@ -76,7 +76,10 @@ Add the integration via **Settings → Devices & Services → Add Integration �
 1. **Enter your e-mail address.** PPL CZ sends a 4-digit PIN to that inbox.
 2. **Enter the PIN** from that e-mail.
 
-That's it — no password. Your parcels are imported automatically and refreshed on a schedule. The session renews itself silently; you only log in again if Home Assistant asks you to (a rare **reauth** prompt, roughly every two weeks if the integration hasn't polled successfully in that time).
+That's it — no password. Your parcels are imported automatically and refreshed on a schedule. The session renews itself silently; you only log in again if Home Assistant asks you to (a **reauth** prompt).
+
+> [!IMPORTANT]
+> **A mojePPL account can only be signed in one place at a time.** PPL issues a single credential per account and replaces it on every sign-in, so connecting Home Assistant signs the mobile app out — and signing back in on the app disconnects Home Assistant until you reconnect it here. This is how PPL's login works; the integration cannot work around it.
 
 ## Options
 
@@ -185,7 +188,7 @@ logger:
 
 ## Troubleshooting
 
-- **Home Assistant asks me to reconnect PPL CZ** — the stored session could not be renewed (typically because it's been more than two weeks since a successful refresh). Follow the reauth prompt: enter your e-mail and the fresh PIN it e-mails you.
+- **Home Assistant asks me to reconnect PPL CZ** — the stored sign-in was rejected. By far the most common cause is that the account was signed in somewhere else, usually the mojePPL app, which replaces the credential Home Assistant holds (see the note under [Configuration](#configuration)). Follow the reauth prompt: enter your e-mail and the fresh PIN it e-mails you. Doing so signs the app out again.
 - **A parcel shows `unknown`** — PPL CZ has not scanned it yet, or reports a status we do not map. If a status logs "Unrecognised PPL CZ status", please [open an issue](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/new) with the logged line so the mapping can be extended.
 
 ## Related integrations

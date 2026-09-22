@@ -13,6 +13,7 @@ from custom_components.ppl_cz.api import (
     _parse_expires_in,
 )
 from custom_components.ppl_cz.const import (
+    AZURE_CREDENTIAL_REJECTED_ERRORS,
     AZURE_TOKEN_URL,
     REGISTRATION_CONFIRM_URL,
     REGISTRATIONS_URL,
@@ -178,9 +179,12 @@ async def test_exchange_password_stores_tokens_and_reports_update():
     assert updated[0] == (client.access_token, client.token_expires_at)
 
 
-@pytest.mark.parametrize("status", [400, 401])
-async def test_exchange_password_rejected_raises_auth_error(status):
-    session = _Session({("post", AZURE_TOKEN_URL): [(status, {})]})
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [(400, {"error": "access_denied"}), (401, {})],
+)
+async def test_exchange_password_rejected_raises_auth_error(status, body):
+    session = _Session({("post", AZURE_TOKEN_URL): [(status, body)]})
     with pytest.raises(PPLCZAuthError):
         await PPLCZApiClient(session).async_exchange_password("a@b.c", "bad")
 
@@ -256,9 +260,24 @@ async def test_remint_without_credentials_raises_auth_error():
         await client.async_get_parcels()
 
 
-@pytest.mark.parametrize("status", [400, 401, 403])
+@pytest.mark.parametrize("status", [401, 403])
 async def test_remint_rejected_raises_auth_error(status):
     session = _Session({("post", AZURE_TOKEN_URL): [(status, {})]})
+    client = PPLCZApiClient(session, email="a@b.c", password="pw")
+    with pytest.raises(PPLCZAuthError):
+        await client.async_get_parcels()
+
+
+@pytest.mark.parametrize("error", sorted(AZURE_CREDENTIAL_REJECTED_ERRORS))
+async def test_remint_credential_rejection_raises_auth_error(error):
+    """The two 400 error codes that mean the stored password itself is dead.
+
+    ``access_denied`` is what a rotated password comes back as — the mojePPL
+    app mints a new one for the same account on every login, so using the app
+    invalidates the credential stored here.
+    """
+    body = {"error": error, "error_description": "AADB2C90225: invalid"}
+    session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
     with pytest.raises(PPLCZAuthError):
         await client.async_get_parcels()
@@ -268,18 +287,33 @@ async def test_remint_rejected_logs_azure_error_body(caplog):
     body = {"error": "invalid_grant", "error_description": "AADB2C90129: revoked"}
     session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
-    with caplog.at_level("DEBUG"):
+    with caplog.at_level("WARNING"):
         with pytest.raises(PPLCZAuthError):
             await client.async_get_parcels()
     assert "invalid_grant" in caplog.text
     assert "AADB2C90129: revoked" in caplog.text
+    assert "mojePPL app" in caplog.text
 
 
-async def test_remint_rejected_unparseable_body_does_not_mask_auth_error():
-    session = _Session({("post", AZURE_TOKEN_URL): [(400, ValueError("nope"))]})
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"error": "temporarily_unavailable"},
+        {},
+        ValueError("nope"),
+    ],
+)
+async def test_remint_unrecognised_400_is_not_a_reauth(body):
+    """A 400 Azure doesn't explain is not a credential rejection.
+
+    Reauth would send the user after a PIN that fixes nothing, so these stay
+    plain API errors and get retried — the mojePPL app draws the same line.
+    """
+    session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
-    with pytest.raises(PPLCZAuthError):
+    with pytest.raises(PPLCZApiError) as excinfo:
         await client.async_get_parcels()
+    assert not isinstance(excinfo.value, PPLCZAuthError)
 
 
 async def test_remint_outage_raises_api_error():

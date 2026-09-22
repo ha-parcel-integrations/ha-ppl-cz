@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Set up PPL CZ",
-        "description": "Enter the e-mail address of your mojePPL account. PPL CZ will send a PIN to that address.",
+        "description": "Enter the e-mail address of your mojePPL account. PPL CZ will send a PIN to that address.\n\nA mojePPL account has one sign-in: setting this up signs the mobile app out, and signing in to the app later disconnects Home Assistant until you reconnect it here.",
         "data": {
           "email": "E-mail address"
         }
@@ -18,7 +18,7 @@
       },
       "reauth_confirm": {
         "title": "PPL CZ sign-in expired",
-        "description": "PPL CZ no longer accepts the stored session for {email}. Request a new PIN to sign in again."
+        "description": "PPL CZ no longer accepts the stored sign-in for {email}. This usually means the account was signed in somewhere else — signing in to the mojePPL app replaces the password Home Assistant stored. Request a new PIN to reconnect."
       }
     },
     "error": {

@@ -5,7 +5,7 @@
       "user": {
         "title": "Set up PPL CZ",
         "menu_options": {
-          "account": "Account",
+          "account": "Account (automatic import)",
           "tracking": "Tracking codes"
         },
         "description": "A mojePPL account can only be signed in one place at a time. Choosing **Account** signs you out of the mojePPL app, and signing back in on the app disconnects Home Assistant until you reconnect it here. **Tracking codes** needs no account, so nothing gets signed out — but you add each parcel's barcode yourself instead of them appearing automatically."

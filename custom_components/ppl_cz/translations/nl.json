@@ -5,7 +5,7 @@
       "user": {
         "title": "PPL CZ instellen",
         "menu_options": {
-          "account": "Account",
+          "account": "Account (automatisch importeren)",
           "tracking": "Trackingcodes"
         },
         "description": "Een mojePPL-account kan maar op één plek tegelijk aangemeld zijn. Kies je **Account**, dan word je afgemeld in de mojePPL-app, en als je je daarna weer aanmeldt in de app, verliest Home Assistant de verbinding tot je hier opnieuw koppelt. **Trackingcodes** heeft geen account nodig, dus daar wordt niemand voor afgemeld — maar je voegt elke pakketbarcode zelf toe in plaats van dat ze automatisch verschijnen."

@@ -5,7 +5,7 @@
       "user": {
         "title": "Nastavit PPL CZ",
         "menu_options": {
-          "account": "Účet",
+          "account": "Účet (automatický import)",
           "tracking": "Sledovací kódy"
         },
         "description": "Účet mojePPL může být přihlášen jen na jednom místě zároveň. Zvolíte-li **Účet**, odhlásíte se z aplikace mojePPL, a pozdější přihlášení v aplikaci odpojí Home Assistant, dokud ho zde znovu nepropojíte. **Sledovací kódy** nepotřebují žádný účet, takže se nikdo neodhlásí — ale čísla zásilek přidáváte sami, místo aby se objevovaly automaticky."

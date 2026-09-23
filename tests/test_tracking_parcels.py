@@ -209,6 +209,58 @@ def test_normalize_parcel_raw_is_curated_not_verbatim():
     assert parcel["raw"]["phase"] == raw["phase"]
 
 
+def test_normalize_parcel_raw_keeps_the_state_fields():
+    """The payload's own state bits belong under raw, the draw hints do not."""
+    raw = tracking_shipment()
+    parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)["raw"]
+    for key in (
+        "externalShipmentId",
+        "pinGenerated",
+        "eveningDelivery",
+        "deliveryChangeAllowed",
+        "shipmentRefuseAllowed",
+        "podReportVisible",
+        "ePopReportVisible",
+    ):
+        assert key in parcel, key
+    for key in ("showDeliveryDate", "showParcelShop", "editMode"):
+        assert key not in parcel, key
+
+
+def test_normalize_parcel_sender_from_the_live_integer_address_type():
+    """The live payload keys the party on an int, not the string 'SENDER'."""
+    raw = tracking_shipment()
+    assert raw["addresses"][0]["type"] == 4
+    assert normalize_parcel(raw, tracking_code=TRACKING_CODE)["sender"] == "Example Sender"
+
+
+def test_normalize_parcel_unknown_address_type_warns_once_and_leaves_sender_none(caplog):
+    raw = tracking_shipment()
+    raw["addresses"] = [{"type": 99, "name": "Someone"}, {"type": 99, "name": "Else"}]
+    with caplog.at_level("WARNING"):
+        parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)
+    assert parcel["sender"] is None
+    assert caplog.text.count("Unrecognised PPL CZ address type") == 1
+
+
+def test_map_status_falls_back_to_the_base_code_before_the_dot(caplog):
+    """A qualifier narrows where/how, never the phase — so the base maps it."""
+    with caplog.at_level("WARNING"):
+        assert map_parcel_status("WaitingForShipment.Foreign") is ParcelStatus.REGISTERED
+    assert "Unrecognised" not in caplog.text
+
+
+def test_an_explicit_full_code_still_beats_its_base_code():
+    assert map_parcel_status("Delivered.BackToSender") is ParcelStatus.DELIVERED
+    assert map_parcel_status("BackToSender") is ParcelStatus.RETURNING
+
+
+def test_a_dotted_code_whose_base_is_unknown_still_warns(caplog):
+    with caplog.at_level("WARNING"):
+        assert map_parcel_status("SomethingNew.Qualified") is ParcelStatus.UNKNOWN
+    assert "SomethingNew.Qualified" in caplog.text
+
+
 def test_normalize_parcel_sender_from_addresses():
     raw = tracking_shipment()
     parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)

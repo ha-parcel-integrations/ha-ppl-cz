@@ -187,10 +187,9 @@ def tracking_shipment(
     return {
         "shipmentId": code,
         "weight": weight,
-        "addresses": [
-            {"type": "SENDER", "name": "Example Sender"},
-            {"type": "RECIPIENT", "name": "Example Recipient"},
-        ],
+        # Mirrors the confirmed live shape: a single entry keyed on an
+        # integer type, not the string one an earlier fixture invented.
+        "addresses": [{"type": 4, "country": "CZ", "name": "Example Sender"}],
         "phase": phase,
         "lastEventCode": phase,
         "lastEventText": "Example status text",
@@ -203,6 +202,18 @@ def tracking_shipment(
         "hierarchy": {"parentReference": None, "childReference": None},
         "packagesInSet": 1,
         "isBackToSender": False,
+        "externalShipmentId": "JJD000000000000000000000000",
+        "pinGenerated": True,
+        "eveningDelivery": False,
+        "deliveryChangeAllowed": False,
+        "shipmentRefuseAllowed": False,
+        "podReportVisible": True,
+        "ePopReportVisible": False,
+        # Presentational only — kept in the fixture so the curated-raw test
+        # proves they are filtered out, not merely absent.
+        "showDeliveryDate": False,
+        "showParcelShop": False,
+        "editMode": None,
     }
 
 

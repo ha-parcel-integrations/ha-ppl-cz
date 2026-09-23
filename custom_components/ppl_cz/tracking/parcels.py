@@ -81,6 +81,25 @@ def _warn_unmapped_status(code: str) -> None:
     )
 
 
+def _lookup_status(code: str) -> ParcelStatus | None:
+    """Map one granular code, falling back to its base code before the dot.
+
+    PPL qualifies a base code with a dotted suffix — ``Delivered.Parcelshop``,
+    ``WaitingForShipment.Foreign`` — and the set of suffixes is open: the
+    teardown never enumerated it, and new ones keep turning up on real
+    parcels. A qualifier only narrows *where* or *how*, never which phase the
+    parcel is in, so falling back to the base code maps a suffix nobody has
+    seen yet instead of reporting ``unknown``. An explicit full-code entry
+    still wins, which is what keeps ``Delivered.BackToSender`` (delivered,
+    back at the sender) apart from bare ``BackToSender`` (still returning).
+    """
+    mapped = _STATUS_MAP.get(code)
+    if mapped is not None:
+        return mapped
+    base, dot, _ = code.partition(".")
+    return _STATUS_MAP.get(base) if dot else None
+
+
 def map_parcel_status(code: str | None) -> ParcelStatus:
     """Map a granular tracking code to a canonical :class:`ParcelStatus`.
 
@@ -90,7 +109,7 @@ def map_parcel_status(code: str | None) -> ParcelStatus:
     """
     if not code:
         return ParcelStatus.UNKNOWN
-    mapped = _STATUS_MAP.get(code)
+    mapped = _lookup_status(code)
     if mapped is not None:
         return mapped
     _warn_unmapped_status(code)
@@ -106,7 +125,7 @@ def map_event_status(code: str | None) -> ParcelStatus | None:
     """
     if not code:
         return None
-    mapped = _STATUS_MAP.get(code)
+    mapped = _lookup_status(code)
     if mapped is not None:
         return mapped
     _warn_unmapped_status(code)
@@ -196,11 +215,58 @@ def _pickup_point_name(access_point: Any) -> str | None:
     return access_point.get("parcelshopName") or access_point.get("name") or None
 
 
+# The only `addresses[].type` ever seen on this surface, on incoming parcels
+# whose single entry was the sending party. The enum's other members were
+# never enumerated, so an unseen value warns once instead of being guessed at
+# — on an outgoing parcel this same value may well mean the recipient.
+_ADDRESS_TYPE_SENDER = 4
+
+_unknown_address_types_logged: set[object] = set()
+
+
+def _warn_unknown_address_type(value: object) -> None:
+    """Log an unrecognised address ``type`` once, with a copy-paste issue link."""
+    if value in _unknown_address_types_logged:
+        return
+    _unknown_address_types_logged.add(value)
+    _LOGGER.warning(
+        "Unrecognised PPL CZ address type — help us map it. Open an issue "
+        "and paste this line: %s\n  addresses[].type=%r → sender left empty",
+        NEW_ISSUE_URL,
+        value,
+    )
+
+
+def _sender_from(addresses: object) -> str | None:
+    """Return the sending party's name from the payload's ``addresses``.
+
+    The live payload keys the party on an integer ``type``; the string form
+    is accepted too so a future rename doesn't silently blank the field.
+    """
+    if not isinstance(addresses, list):
+        return None
+    for entry in addresses:
+        if not isinstance(entry, dict):
+            continue
+        kind = entry.get("type")
+        if kind in (_ADDRESS_TYPE_SENDER, "SENDER"):
+            if name := entry.get("name"):
+                return name
+        elif kind is not None:
+            _warn_unknown_address_type(kind)
+    return None
+
+
 # Curated subset of the tracking payload kept under `raw` — mirrors the
 # account source's own curated allowlist rather than passing the payload
 # through verbatim. `addresses` (full sender/receiver address blocks) and
 # `accessPoint`'s own contents (already summarised into `pickup_point`) stay
 # out of a plain sensor attribute.
+# Purely presentational flags the website uses to decide what to draw
+# (`showDeliveryDate`, `showParcelShop`, `showDeliveryTime`, `editMode`) say
+# nothing about the parcel, and `canPayByCard` already appears inside `cod`,
+# so none of them are here. `parcelConectNumber` repeated `externalShipmentId`
+# verbatim in every sample seen — only one of the pair is kept.
 _RAW_FIELDS = (
     "phase",
     "lastEventCode",
@@ -209,6 +275,13 @@ _RAW_FIELDS = (
     "packagesInSet",
     "isBackToSender",
     "hierarchy",
+    "externalShipmentId",
+    "pinGenerated",
+    "eveningDelivery",
+    "deliveryChangeAllowed",
+    "shipmentRefuseAllowed",
+    "podReportVisible",
+    "ePopReportVisible",
 )
 
 
@@ -236,17 +309,7 @@ def normalize_parcel(
     delivered_at = to_iso_timestamp(raw.get("lastEventDate")) if delivered else None
     planned_from = None if delivered else to_iso_timestamp(raw.get("expectedDeliveryDate"))
 
-    addresses = raw.get("addresses")
-    sender = None
-    if isinstance(addresses, list):
-        sender = next(
-            (
-                a.get("name")
-                for a in addresses
-                if isinstance(a, dict) and a.get("type") == "SENDER" and a.get("name")
-            ),
-            None,
-        )
+    sender = _sender_from(raw.get("addresses"))
 
     raw_extra = {key: raw[key] for key in _RAW_FIELDS if key in raw}
 

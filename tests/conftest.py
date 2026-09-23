@@ -21,7 +21,7 @@ def reset_one_shot_warnings():
     makes them leak across tests, so whether a warning fires would otherwise
     depend on test order.
     """
-    from custom_components.ppl_cz import parcels
+    from custom_components.ppl_cz.account import parcels
 
     parcels._unmapped_statuses_logged.clear()
     parcels._items_shape_logged = False

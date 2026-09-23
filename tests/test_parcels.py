@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-import custom_components.ppl_cz.parcels as parcels_mod
+import custom_components.ppl_cz.account.parcels as parcels_mod
 from custom_components.ppl_cz.const import (
     CAPABILITIES,
     CONF_DELIVERED_FILTER_AMOUNT,

@@ -7,6 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 import custom_components.ppl_cz.account.parcels as parcels_mod
 from custom_components.ppl_cz.const import (
     CAPABILITIES,
+    CAPABILITIES_BY_VARIANT,
     CONF_DELIVERED_FILTER_AMOUNT,
     CONF_DELIVERED_FILTER_TYPE,
     DIRECTION_INCOMING,
@@ -336,10 +337,27 @@ def test_delivered_filter_by_count():
 
 
 def test_capabilities_are_known_values():
-    """A typo here would silently misreport this carrier on the docs site."""
-    assert CAPABILITIES <= KNOWN_CAPABILITIES
+    """A typo in any variant's set would silently misreport it on the docs site."""
+    for capabilities in CAPABILITIES_BY_VARIANT.values():
+        assert capabilities <= KNOWN_CAPABILITIES
 
 
-def test_capabilities_are_pickup_point_url_and_history():
-    """The list DTOs carry no weight/dimensions/ETA at all."""
-    assert CAPABILITIES == {"pickup_point", "url", "history"}
+def test_account_capabilities_are_pickup_point_url_and_history():
+    """The account list DTOs carry no weight/dimensions/ETA at all."""
+    assert CAPABILITIES_BY_VARIANT["Account"] == {"pickup_point", "url", "history"}
+
+
+def test_tracking_capabilities_add_weight_and_delivery_window():
+    """The website payload adds a real weight and expectedDeliveryDate."""
+    assert CAPABILITIES_BY_VARIANT["Tracking"] == {
+        "weight",
+        "delivery_window",
+        "pickup_point",
+        "url",
+        "history",
+    }
+
+
+def test_capabilities_flat_alias_matches_the_account_variant():
+    """CAPABILITIES is a flat alias for any docs-site consumer expecting one set."""
+    assert CAPABILITIES == CAPABILITIES_BY_VARIANT["Account"]

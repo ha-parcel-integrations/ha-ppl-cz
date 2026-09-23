@@ -4,6 +4,14 @@
     "step": {
       "user": {
         "title": "PPL CZ instellen",
+        "menu_options": {
+          "account": "Account",
+          "tracking": "Trackingcodes"
+        },
+        "description": "Een mojePPL-account kan maar op één plek tegelijk aangemeld zijn. Kies je **Account**, dan word je afgemeld in de mojePPL-app, en als je je daarna weer aanmeldt in de app, verliest Home Assistant de verbinding tot je hier opnieuw koppelt. **Trackingcodes** heeft geen account nodig, dus daar wordt niemand voor afgemeld — maar je voegt elke pakketbarcode zelf toe in plaats van dat ze automatisch verschijnen."
+      },
+      "account": {
+        "title": "PPL CZ instellen",
         "description": "Voer het e-mailadres van je mojePPL-account in. PPL CZ stuurt een pincode naar dat adres.\n\nEen mojePPL-account heeft één aanmelding: dit instellen meldt de mobiele app af, en als je later in de app aanmeldt verliest Home Assistant de verbinding tot je hier opnieuw koppelt.",
         "data": {
           "email": "E-mailadres"
@@ -27,7 +35,7 @@
       "cannot_connect": "Kan geen verbinding maken met PPL CZ. Probeer het opnieuw."
     },
     "abort": {
-      "already_configured": "Dat PPL CZ-account is al ingesteld.",
+      "already_configured": "Die PPL CZ-hub is al ingesteld.",
       "reauth_successful": "PPL CZ is opnieuw geauthenticeerd.",
       "wrong_account": "Die pincode hoort bij een ander PPL CZ-account. Meld je aan met het account waarvoor deze integratie is ingesteld."
     }
@@ -36,6 +44,11 @@
     "step": {
       "init": {
         "title": "PPL CZ-opties",
+        "menu_options": {
+          "incoming_parcels": "Inkomende pakketten",
+          "outgoing_parcels": "Uitgaande pakketten",
+          "settings": "Instellingen"
+        },
         "sections": {
           "delivered": {
             "name": "Bezorgde pakketten",
@@ -54,11 +67,42 @@
               "include_history": "Statusgeschiedenis toevoegen"
             },
             "data_description": {
-              "include_history": "Voegt per pakket een geschiedenisattribuut toe met elke statusupdate (tijdstip, status, oorspronkelijke tekst). Kost één extra verzoek per pakket per verversing. Standaard uit."
+              "include_history": "Voegt per pakket een geschiedenisattribuut toe met elke statusupdate (tijdstip, status, oorspronkelijke tekst). Standaard uit."
             }
           }
         }
+      },
+      "incoming_parcels": {
+        "title": "Inkomende pakketten beheren",
+        "description": "Trackingcodes voor pakketten die je verwacht. De trackinggegevens van PPL CZ kunnen een verzonden pakket niet onderscheiden van een ontvangen pakket, dus voeg elke code toe aan de juiste lijst.",
+        "data": {
+          "tracking_codes": "Trackingcodes"
+        },
+        "data_description": {
+          "tracking_codes": "De PPL CZ-trackingcode(s), zoals afgedrukt op de verzendbevestiging of het bezorgbericht."
+        }
+      },
+      "outgoing_parcels": {
+        "title": "Uitgaande pakketten beheren",
+        "description": "Trackingcodes voor pakketten die je hebt verzonden. Ze worden apart geteld en gerapporteerd, zodat ze niet meetellen bij je inkomende pakketten.",
+        "data": {
+          "tracking_codes": "Trackingcodes"
+        },
+        "data_description": {
+          "tracking_codes": "De PPL CZ-trackingcode(s), zoals afgedrukt op de verzendbevestiging."
+        }
+      },
+      "settings": {
+        "title": "Instellingen",
+        "data": {
+          "delivered_filter_type": "Bezorgde pakketten: filteren op",
+          "delivered_filter_amount": "Bezorgde pakketten: aantal",
+          "include_history": "Statusgeschiedenis toevoegen"
+        }
       }
+    },
+    "error": {
+      "invalid_tracking_code": "Voer minstens één trackingcode in."
     }
   },
   "selector": {
@@ -82,6 +126,11 @@
     "button": {
       "refresh": {
         "name": "Verversen"
+      }
+    },
+    "calendar": {
+      "deliveries": {
+        "name": "Bezorgingen"
       }
     },
     "sensor": {

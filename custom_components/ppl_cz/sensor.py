@@ -19,7 +19,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import PPLCZConfigEntry
 from .const import DOMAIN, ParcelStatus
-from .coordinator import PPLCZCoordinator
 from .device import ATTRIBUTION, build_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,13 +28,17 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 
-def _active_parcels(coordinator: PPLCZCoordinator) -> list[dict]:
-    """Every active parcel across both directions (incoming + outgoing)."""
+def _active_parcels(coordinator) -> list[dict]:
+    """Every active parcel across both directions (incoming + outgoing).
+
+    Both coordinators expose ``outgoing`` — the account source splits it from
+    the payload, the tracking source from the user-declared direction.
+    """
     return list(coordinator.data or []) + list(coordinator.outgoing or [])
 
 
-def _active_barcodes(coordinator: PPLCZCoordinator) -> set[str]:
-    """Barcodes of every active parcel (both directions)."""
+def _active_barcodes(coordinator) -> set[str]:
+    """Barcodes of every active parcel."""
     return {p.get("barcode", "") for p in _active_parcels(coordinator)}
 
 
@@ -93,7 +96,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class _SummarySensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
+class _SummarySensor(CoordinatorEntity, SensorEntity):
     """Base for the count-of-parcels summary sensors."""
 
     _attr_has_entity_name = True
@@ -102,7 +105,7 @@ class _SummarySensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
     _unrecorded_attributes = frozenset({"parcels"})
     _unique_suffix = ""
 
-    def __init__(self, coordinator: PPLCZCoordinator, entry: ConfigEntry) -> None:
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_{self._unique_suffix}"
@@ -135,7 +138,7 @@ class PPLCZIncomingParcelsSensor(_SummarySensor):
 
     def __init__(
         self,
-        coordinator: PPLCZCoordinator,
+        coordinator,
         entry: ConfigEntry,
         async_add_entities: AddEntitiesCallback,
         known_barcodes: set[str] | None = None,
@@ -218,7 +221,7 @@ class PPLCZOutgoingDeliveredSensor(_SummarySensor):
         return list(self.coordinator.delivered_outgoing or [])
 
 
-class PPLCZParcelSensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
+class PPLCZParcelSensor(CoordinatorEntity, SensorEntity):
     """Per-parcel sensor reporting the status of one tracked PPL CZ parcel."""
 
     _attr_has_entity_name = True
@@ -227,7 +230,7 @@ class PPLCZParcelSensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
     _unrecorded_attributes = frozenset({"raw", "history"})
 
     def __init__(
-        self, coordinator: PPLCZCoordinator, entry: ConfigEntry, barcode: str
+        self, coordinator, entry: ConfigEntry, barcode: str
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -256,7 +259,7 @@ class PPLCZParcelSensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
         return dict(parcel) if parcel else {}
 
 
-class PPLCZLastUpdateSensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
+class PPLCZLastUpdateSensor(CoordinatorEntity, SensorEntity):
     """Diagnostic sensor reporting when PPL CZ was last polled successfully."""
 
     _attr_has_entity_name = True
@@ -265,7 +268,7 @@ class PPLCZLastUpdateSensor(CoordinatorEntity[PPLCZCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_attribution = ATTRIBUTION
 
-    def __init__(self, coordinator: PPLCZCoordinator, entry: ConfigEntry) -> None:
+    def __init__(self, coordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_last_update"

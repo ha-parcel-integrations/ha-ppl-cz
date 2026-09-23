@@ -15,7 +15,10 @@ from . import PPLCZConfigEntry
 #
 # Per the mechanics doc: sender/recipient names and addresses, toAddress,
 # toDeliveryPoint's street/city/zipCode, any cod amount, the tracking number
-# itself, and the access_token/dhl-api-key headers.
+# itself, and the access_token/dhl-api-key headers. Neither DHL_API_KEY nor
+# TRACKING_DHL_API_KEY ever appears in entry data/options/coordinator output
+# — both are request headers this integration sends, never stored or echoed
+# back — so there is nothing of the tracking key to redact here either.
 TO_REDACT = {
     # account / session (entry.data) — "password" is the stored PIN-exchange
     # Azure password the client re-authenticates with (see api.py); it is a
@@ -33,7 +36,7 @@ TO_REDACT = {
     "receiver",
     "pickup_point",
     "url",
-    # PPL CZ payload fields
+    # PPL CZ account-source payload fields
     "number",
     "toAddress",
     "toDeliveryPoint",
@@ -43,6 +46,16 @@ TO_REDACT = {
     "countryCode",
     "cod",
     "name",
+    # PPL CZ tracking-source payload fields
+    "shipmentId",
+    "addresses",
+    "customerReference",
+    "accessPoint",
+    "gps",
+    "openHours",
+    "depot",
+    "parcelshopName",
+    "hierarchy",
 }
 
 
@@ -51,6 +64,8 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for the PPL CZ config entry."""
     coordinator = entry.runtime_data.coordinator
+    outgoing = coordinator.outgoing or []
+    delivered_outgoing = coordinator.delivered_outgoing or []
 
     return {
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
@@ -58,8 +73,8 @@ async def async_get_config_entry_diagnostics(
         "counts": {
             "incoming_active": len(coordinator.data or []),
             "incoming_delivered": len(coordinator.delivered or []),
-            "outgoing_active": len(coordinator.outgoing or []),
-            "outgoing_delivered": len(coordinator.delivered_outgoing or []),
+            "outgoing_active": len(outgoing),
+            "outgoing_delivered": len(delivered_outgoing),
         },
         "polling": {
             "current_tier_minutes": coordinator.current_tier_minutes,
@@ -73,8 +88,6 @@ async def async_get_config_entry_diagnostics(
         "incoming_delivered": async_redact_data(
             coordinator.delivered or [], TO_REDACT
         ),
-        "outgoing": async_redact_data(coordinator.outgoing or [], TO_REDACT),
-        "outgoing_delivered": async_redact_data(
-            coordinator.delivered_outgoing or [], TO_REDACT
-        ),
+        "outgoing": async_redact_data(outgoing, TO_REDACT),
+        "outgoing_delivered": async_redact_data(delivered_outgoing, TO_REDACT),
     }

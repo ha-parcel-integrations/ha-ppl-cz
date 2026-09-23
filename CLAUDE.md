@@ -1,11 +1,13 @@
 # Working in this repository
 
-Home Assistant custom integration for **PPL CZ** parcel tracking (the mojePPL
-account app's REST backend). Distributed via HACS; not part of HA core. One
-carrier in the [ha-parcel-integrations](https://github.com/ha-parcel-integrations)
-suite, **generated from ha-carrier-template** — everything outside
+Home Assistant custom integration for **PPL CZ** parcel tracking. Distributed
+via HACS; not part of HA core. One carrier in the
+[ha-parcel-integrations](https://github.com/ha-parcel-integrations) suite,
+**generated from ha-carrier-template** — everything outside
 *Carrier-specific notes* is suite-wide; when in doubt check the template or a
-sibling repo. Account-based (passwordless e-mail + PIN login), no manual
+sibling repo. **Two sources**, picked at setup: **account** (the mojePPL app's
+REST backend, passwordless e-mail + PIN login) and **tracking** (the public
+website's tracking-by-number backend, no credential at all). No manual
 services. No DTO layer.
 
 ## Shared conventions — fetch when relevant
@@ -30,14 +32,17 @@ and identical in every carrier — the authoritative spec is
 Where this repo diverges from it, that is recorded below under
 *Divergences from the scaffold*.
 
-**Polling cadence is not configurable — don't add the option back.** The
-Section 2.2 account-based algorithm always runs: `_async_update_data` recomputes
-`update_interval` at the end of every refresh (quiet window 00:00–06:00 with two
-anchors, hot 15 min / mid 45 min, never a full stop because the mid-tier poll is
-also how a new shipment on the account gets discovered, plus a per-install
-stagger). The `refresh_interval` dropdown (Phase 1, 0.10.0) is gone; a stale
-stored value is never read. The options flow has two sections left, `delivered`
-and `history`.
+**Polling cadence is not configurable — don't add the option back.** Both
+coordinators recompute `update_interval` at the end of every
+`_async_update_data` (quiet window 00:00–06:00 with two anchors, hot 15 min
+/ mid 45 min, plus a per-install stagger). The **account** coordinator
+follows Section 2.2 (never a full stop, since the mid-tier poll is also how
+a new shipment on the account gets discovered); the **tracking** coordinator
+follows Section 2.1 instead and may suspend entirely — see *Divergences from
+the scaffold*. The `refresh_interval` dropdown (Phase 1, 0.10.0) is gone; a
+stale stored value is never read. The account options flow has two sections
+left, `delivered` and `history`; the tracking options flow is a menu instead
+— see the two-source note below.
 
 **Suite-wide tripwires, kept inline on purpose:**
 - **First refresh in `__init__.py`, before `async_forward_entry_setups`** — from
@@ -53,12 +58,72 @@ and `history`.
 
 **API mechanics live in `carrier-research/ppl-cz/api/` (private research
 repo)** — the three-call email+PIN login, the Azure AD B2C ROPC token
-exchange, the `dhl-api-key` static header, the shipment list/events endpoints
-and the status vocabulary. Not duplicated here; this section is
-integration-level decisions only.
+exchange, both `dhl-api-key` static headers, the shipment list/events
+endpoints, the website tracking-by-number endpoint and both status
+vocabularies. Not duplicated here; this section is integration-level
+decisions only.
+
+**Two sources, `account/` and `tracking/` subpackages (2026-09-23).**
+Mirrors bpost's split exactly: each source owns its client, coordinator and
+normaliser under `custom_components/ppl_cz/<source>/`; `api.py`,
+`coordinator.py` and `parcels.py` at package root are re-export shims kept so
+pre-split imports and automations still resolve (`api.py`/`coordinator.py`
+use bpost's `globals().update(vars(_account))` trick, not a named re-export,
+since the account modules have a wide public surface — including private
+helpers older tests reach into). `session.py` stays at the root: both
+sources hit `api.dhl.com` and need the cookie-free jar, so it isn't an
+account concern.
+- **`entry.data[CONF_SOURCE]` picks the source** (`account` / `tracking`),
+  chosen from a menu at setup. **A missing key defaults to `SOURCE_ACCOUNT`**
+  — the inverse of bpost's default, because this repo started as an
+  account-only integration. Every `entry.data.get(CONF_SOURCE, …)` in this
+  repo takes `SOURCE_ACCOUNT` as its fallback; getting it backwards would
+  silently convert every existing user's account hub into an empty tracking
+  hub on upgrade.
+- **`CAPABILITIES`/`PLATFORMS` are per-source.** `PLATFORMS` is a
+  `CONF_SOURCE`-keyed dict (`__init__.py` always calls
+  `async_forward_entry_setups`/`async_unload_platforms` with
+  `PLATFORMS[source]`, never a union) — account gets `[BUTTON, SENSOR]`,
+  tracking gets `[BUTTON, CALENDAR, SENSOR]` since only it has a real ETA.
+  `CAPABILITIES` itself stays a **`CAPABILITIES_BY_VARIANT`** dict, not
+  `CONF_SOURCE`-keyed — the docs site's generator
+  (`ha-parcel-integrations.github.io/scripts/generate.py`) regex-parses that
+  exact constant name (see bpost's own precedent), keyed by human-readable
+  variant labels (`"Account"`/`"Tracking"`) rather than the internal
+  `SOURCE_*` values. `CAPABILITIES` is a flat alias to the `"Account"`
+  variant for any consumer still expecting one set.
+- **The tracking hub is a singleton; account hubs stay multi-entry.**
+  `async_set_unique_id(f"{DOMAIN}_{SOURCE_TRACKING}")` +
+  `_abort_if_unique_id_configured()` in `config_flow.py` — the same effect
+  `single_config_entry` has for `ha-sunyou`/`ha-quickpac`/`ha-sameday`,
+  applied to one source instead of the whole integration. Do **not** add
+  `single_config_entry` to `manifest.json` — multi-account is deliberate.
+- **Reauth is account-only and unreachable from a tracking entry** — the
+  tracking coordinator has no credential to reject, so it never raises
+  `ConfigEntryAuthFailed`.
+- **Tracking-source direction (incoming/outgoing) is declared by the user,
+  never inferred.** The website payload carries no `discriminator` and no
+  sender/recipient split, and with no account there is no identity to
+  compare a party against — a parcel the user sent and one they are
+  receiving look identical on the wire. Copied `ha-packeta`'s solution for
+  the same account-less problem: `CONF_DIRECTION` on each `CONF_PARCELS`
+  entry (`DIRECTION_INCOMING`/`DIRECTION_OUTGOING`,
+  `DEFAULT_DIRECTION = DIRECTION_INCOMING` so a pre-existing entry needs no
+  migration), one shared list, two options-flow steps
+  (`incoming_parcels`/`outgoing_parcels`) that each replace only their own
+  direction's entries — `tracking/parcels.tracked_direction()` and
+  `config_flow._async_step_parcel_list()`. Do not reuse
+  `account/parcels.shipment_direction()` — it reads account-only fields.
+  The tracking coordinator wires into the *same* outgoing sensors/events the
+  account source already has (`outgoing_parcels`, `outgoing_delivered_parcels`,
+  the two outgoing device triggers) rather than inventing parallel ones.
+- **The website `dhl-api-key` is a second, distinct shared secret** from the
+  mobile app's, with its own 2026-09-23 accepted-risk ruling — see the
+  transport rules below. Never let either key value appear outside
+  `const.py`.
 
 **Login is three network calls behind two user-facing steps.**
-`async_step_user` requests a PIN (`POST registrations`); `async_step_code`
+`async_step_account` requests a PIN (`POST registrations`); `async_step_code`
 confirms it (`PUT registrations/{id}` → a one-time Azure password) and
 immediately exchanges that password for a bearer token pair (Azure B2C ROPC,
 `grant_type=password`). Reauth (`async_step_reauth` → `async_step_reauth_confirm`)
@@ -190,32 +255,41 @@ was cached (or `None`) rather than failing the whole poll or blanking the
 attribute; a genuine `PPLCZAuthError` still propagates (that's a real
 "log in again" signal, not a per-parcel hiccup).
 
-**`raw` is a curated subset, not the whole payload.** `parcels._RAW_FIELDS`
+**`raw` is a curated subset, not the whole payload.** `account/parcels._RAW_FIELDS`
 exposes only `ownership`, `cod`, `phaseText`, `discriminator`,
 `codPaidStatus`, `isWaitingForSync` — per the build plan's own mapping
 table. `toAddress` / `toDeliveryPoint` are deliberately left out of the
 per-parcel sensor's `raw` attribute (not just redacted in diagnostics): a
 full delivery address has no reason to sit in a plain entity attribute
-that shows up in the HA UI and logbook.
+that shows up in the HA UI and logbook. The tracking source curates its own
+`raw` the same way (`tracking/parcels._RAW_FIELDS`) — `addresses` and
+`accessPoint`'s own contents stay out for the same reason.
 
-**No ETA, ever.** PPL CZ's DTOs carry no `planned_from`/`planned_to` source
-at all (confirmed absent from the mechanics doc's field list, not just
-usually empty) — so, like vinted-go, this integration ships **no calendar
-platform and no `next_delivery` sensor** rather than a permanently-inert
-one. `const.py`'s `PLATFORMS` and `CAPABILITIES` both reflect this; keep
-them in agreement if that ever changes.
+**No ETA, ever — account source only.** PPL CZ's account DTOs carry no
+`planned_from`/`planned_to` source at all (confirmed absent from the
+mechanics doc's field list, not just usually empty) — so, like vinted-go,
+the account source ships **no calendar platform and no `next_delivery`
+sensor** rather than a permanently-inert one. This does **not** carry over
+to the tracking source, which has a real `expectedDeliveryDate` and does get
+a calendar entity — see the two-source note above. `const.py`'s `PLATFORMS`
+and `CAPABILITIES_BY_VARIANT` both reflect the split; keep them in agreement
+if either source's field support ever changes.
 
-**Pre-1.0 one-shot warnings** (`parcels.py`, all structure-only — no
+**Pre-1.0 one-shot warnings** (`account/parcels.py`, all structure-only — no
 values): first populated shipment-list item shape, first populated
 event-history item shape, an unmapped `lastShipmentEvent`/event `code`, a
 `toDeliveryPoint.type` value seen for the first time (the enum's members
 were never enumerated in the teardown), and a shipment whose direction
-couldn't be determined. Every one of these fires because the item payload
-is still `payload: reconstructed` — the test account used for the live
-capture had zero shipments. **The gate item that stays open post-build**:
-replace the reconstruction in `tracking.md` with a real body once a real
-account/parcel is available, and correct anything these warnings surface
-along the way.
+couldn't be determined. **The incoming item shape is now confirmed** — a
+real user's diagnostics (issue #1, 2026-08-22) supplied a populated
+`items[]` with two delivered incoming shipments, full 7-event histories and
+no unrecognised code — but **the outgoing item shape stays open**: no real
+outgoing shipment has been seen, so `toAddress`, `toDeliveryPoint` and a
+populated `cod` on that side are still reconstructed, and the warnings above
+stay armed for it. The tracking source needs none of this net — its payload
+was confirmed live on real parcels before it shipped, so
+`tracking/parcels.py` has no first-sighting warnings, only the one-shot
+unmapped-status warning every source in the suite carries.
 
 **`deliveryInfo` research probe (2026-09-01) — logging only, never a data
 source.** `GET .../shipments/{id}/deliveryInfo` (per
@@ -248,7 +322,11 @@ and `registrationSessionId` each time exactly as `config_flow.py` does. So a
 mojePPL app login rotates the password stored here out from under us, and a
 setup/reauth here does the same to the phone. **This is not fixable** — the
 PIN arrives by e-mail, so reconnecting is inherently manual. It is disclosed
-instead, in the `user` and `reauth_confirm` step descriptions and the README.
+instead, in the `user` (source menu), `account` and `reauth_confirm` step
+descriptions and the README. **This is also the whole reason the tracking
+source exists** — it gives users a way to sidestep the eviction entirely,
+without fixing it (see the two-source note above and
+[issue #4](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/4)).
 Don't re-add a "multi-device is fine" claim anywhere.
 
 Note this is a *different* failure from the ~60-minute lineage revocation
@@ -269,35 +347,63 @@ prompt either way, and Azure's `error`/`error_description` are the only thing
 that tells a rotated password apart from a revoked one in an issue report.
 Neither field carries user PII.
 
-**Do not build:** the website tracking-by-number surface
-(`ppl.cz/vyhledat-zasilku` → `api.dhl.com/ecs/ppl/webapi/TrackAndTrace`) — a
-per-request Google reCAPTCHA v3 token generated client-side, not solvable
-without a real browser; anything under `/api/v1/me/profiles`,
+**Account do-not-build list:** anything under `/api/v1/me/profiles`,
 `/cod_payments`, `/ratings`, `/recipient_availability`, `/recipient_phone`,
 `/title`, `/archive` — user-profile edits, payments and ratings, none of it
 a parcel field.
+
+**Website tracking transport rules (`tracking/api.py`), all load-bearing:**
+- **The empty JSON body (`{}`) is required on every POST** — omitting it is
+  a `415 UnsupportedMediaType`, not a `400`. `async_get_parcel` always sends
+  `json={}`, never omits the argument.
+- **No reCAPTCHA token, cookie, `Origin` or `Referer` is sent, and none is
+  needed.** The 2026-08-22 "reCAPTCHA-walled" verdict was wrong — reversed
+  2026-09-23 by re-probing with plain `curl`: the bundled React app does
+  mint a token, but the server never checks it. Do not add browser
+  fingerprinting or a recaptcha solver here; a real `401`/`403` means the
+  key was rejected, not that a captcha is needed.
+- **Not found is a `400`, matched on `detail`, never on the status alone.**
+  `{"title":"BadRequest","status":400,"detail":"service.TrackAndTrace.ShipmentNotFound"}`
+  raises `PPLCZTrackingNotFound`; any other `400` (or a `400` whose body
+  won't parse) raises the plain `PPLCZTrackingApiError` — a real malformed
+  request or a rejected key must never be read as "parcel not found".
+- **No `PPLCZAuthError` path exists on this source.** There is no
+  credential, so nothing can expire; a rejected `TRACKING_DHL_API_KEY` is a
+  compatibility failure (`PPLCZTrackingApiError`) that needs a new release,
+  never a user-facing reauth prompt.
 
 ## Divergences from the scaffold
 
 Everything not listed here follows the scaffold exactly.
 
-*Options and reloads* — account-based, so `async_schedule_reload` on submit
-with **no** update listener. The interval half of this divergence is gone:
-`CONF_REFRESH_INTERVAL` (15/30/60/120/240 min plus `"auto"`, Phase 1, 0.10.0)
-was removed in the Phase 2 convergence (maintainer decision 2026-09-12, every
-remaining Phase-1 carrier goes unconditional), so this carrier now matches the
-scaffold's no-interval model — see the tripwire above; don't add the option
-back.
+*Options and reloads* — **account source**: `async_schedule_reload` on
+submit with **no** update listener (unchanged by the source split). The
+interval half of this divergence is gone: `CONF_REFRESH_INTERVAL` (15/30/60/
+120/240 min plus `"auto"`, Phase 1, 0.10.0) was removed in the Phase 2
+convergence (maintainer decision 2026-09-12, every remaining Phase-1 carrier
+goes unconditional), so this carrier now matches the scaffold's no-interval
+model — see the tripwire above; don't add the option back. **Tracking
+source**: the scaffold's own update-listener + live-refresh model, like
+bpost's tracking source and Packeta — combining a reload flow with a
+listener is deprecated, which is exactly why the two sources diverge from
+each other here.
 
-*Dynamic polling* — **PPL CZ's DTOs carry no ETA at all** (see "No ETA, ever"
-above), so `planned_from` is always `None`: every `out_for_delivery` parcel
-takes the "no `planned_from`" branch straight to the hot tier, and the
-1h-lookahead branch is architecturally unreachable from real data — the same
-situation `ha-quickpac`/`ha-sameday`/`ha-sunyou` hit. Its tests therefore
-exercise that branch with hand-built dicts / a patched tier helper rather than
-an invented ETA payload. The tier is surfaced in diagnostics under `"polling"`
-(`current_tier_minutes`, `update_interval_seconds`), recomputed at the end of
-every `_async_update_data`.
+*Dynamic polling* — **account source: PPL CZ's DTOs carry no ETA at all**
+(see "No ETA, ever" above), so `planned_from` is always `None`: every
+`out_for_delivery` parcel takes the "no `planned_from`" branch straight to
+the hot tier, and the 1h-lookahead branch is architecturally unreachable
+from real account data — the same situation `ha-quickpac`/`ha-sameday`/
+`ha-sunyou` hit. Its tests therefore exercise that branch with hand-built
+dicts / a patched tier helper rather than an invented ETA payload. **The
+tracking source has a real `expectedDeliveryDate`**, so its 1h-lookahead
+branch is reachable from real data — its tests use a real ISO timestamp
+instead. Both coordinators surface the tier in diagnostics under
+`"polling"` (`current_tier_minutes`, `update_interval_seconds`), recomputed
+at the end of every `_async_update_data`. One further split: the account
+coordinator never fully suspends (a single call is the only way to
+discover a new shipment); the tracking coordinator may suspend entirely
+when nothing is tracked or everything tracked is delivered, mirroring
+bpost's/Packeta's barcode-based model.
 
 ## Running tests
 

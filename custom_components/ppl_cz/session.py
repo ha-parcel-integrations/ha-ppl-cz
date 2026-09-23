@@ -1,4 +1,10 @@
-"""A cookie-free aiohttp session for the PPL CZ / Azure B2C endpoints."""
+"""A cookie-free aiohttp session, shared by both the account and tracking sources.
+
+Not an account concern despite the Azure B2C root cause below — the tracking
+source hits ``api.dhl.com/ecs/ppl/webapi`` (not Azure), where no cookie is
+wanted either, so both sources create their session from here rather than
+each carrying their own cookie-jar logic.
+"""
 from __future__ import annotations
 
 import aiohttp

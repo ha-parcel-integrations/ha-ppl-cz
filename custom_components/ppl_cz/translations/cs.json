@@ -4,6 +4,14 @@
     "step": {
       "user": {
         "title": "Nastavit PPL CZ",
+        "menu_options": {
+          "account": "Účet",
+          "tracking": "Sledovací kódy"
+        },
+        "description": "Účet mojePPL může být přihlášen jen na jednom místě zároveň. Zvolíte-li **Účet**, odhlásíte se z aplikace mojePPL, a pozdější přihlášení v aplikaci odpojí Home Assistant, dokud ho zde znovu nepropojíte. **Sledovací kódy** nepotřebují žádný účet, takže se nikdo neodhlásí — ale čísla zásilek přidáváte sami, místo aby se objevovaly automaticky."
+      },
+      "account": {
+        "title": "Nastavit PPL CZ",
         "description": "Zadejte e-mailovou adresu svého účtu mojePPL. PPL CZ na ni pošle PIN.\n\nÚčet mojePPL má jen jedno přihlášení: tímto nastavením se odhlásí mobilní aplikace a pozdější přihlášení v aplikaci odpojí Home Assistant, dokud ho zde znovu nepropojíte.",
         "data": {
           "email": "E-mailová adresa"
@@ -27,7 +35,7 @@
       "cannot_connect": "Nepodařilo se spojit s PPL CZ. Zkuste to prosím znovu."
     },
     "abort": {
-      "already_configured": "Tento účet PPL CZ je již nastaven.",
+      "already_configured": "Tento hub PPL CZ je již nastaven.",
       "reauth_successful": "PPL CZ byla úspěšně znovu ověřena.",
       "wrong_account": "Tento PIN patří k jinému účtu PPL CZ. Přihlaste se k účtu, pro který byla tato integrace nastavena."
     }
@@ -36,6 +44,11 @@
     "step": {
       "init": {
         "title": "Možnosti PPL CZ",
+        "menu_options": {
+          "incoming_parcels": "Příchozí zásilky",
+          "outgoing_parcels": "Odchozí zásilky",
+          "settings": "Nastavení"
+        },
         "sections": {
           "delivered": {
             "name": "Doručené zásilky",
@@ -54,11 +67,42 @@
               "include_history": "Zahrnout historii stavů"
             },
             "data_description": {
-              "include_history": "Přidá u každé zásilky atribut s historií každé změny stavu (čas, stav, původní text). Stojí jeden extra požadavek na zásilku při každé aktualizaci. Ve výchozím nastavení vypnuto."
+              "include_history": "Přidá u každé zásilky atribut s historií každé změny stavu (čas, stav, původní text). Ve výchozím nastavení vypnuto."
             }
           }
         }
+      },
+      "incoming_parcels": {
+        "title": "Správa příchozích zásilek",
+        "description": "Sledovací kódy zásilek, které očekáváte. Sledovací data PPL CZ nedokážou odlišit zásilku, kterou jste odeslali, od té, kterou přijímáte, proto zadejte každý kód do správného seznamu.",
+        "data": {
+          "tracking_codes": "Sledovací kódy"
+        },
+        "data_description": {
+          "tracking_codes": "Sledovací kód(y) PPL CZ, jak jsou vytištěny na potvrzení odeslání nebo oznámení o doručení."
+        }
+      },
+      "outgoing_parcels": {
+        "title": "Správa odchozích zásilek",
+        "description": "Sledovací kódy zásilek, které jste odeslali. Počítají se a zobrazují samostatně, takže se nezapočítávají do vašich příchozích zásilek.",
+        "data": {
+          "tracking_codes": "Sledovací kódy"
+        },
+        "data_description": {
+          "tracking_codes": "Sledovací kód(y) PPL CZ, jak jsou vytištěny na potvrzení odeslání."
+        }
+      },
+      "settings": {
+        "title": "Nastavení",
+        "data": {
+          "delivered_filter_type": "Doručené zásilky: filtrovat podle",
+          "delivered_filter_amount": "Doručené zásilky: počet",
+          "include_history": "Zahrnout historii stavů"
+        }
       }
+    },
+    "error": {
+      "invalid_tracking_code": "Zadejte alespoň jeden sledovací kód."
     }
   },
   "selector": {
@@ -82,6 +126,11 @@
     "button": {
       "refresh": {
         "name": "Aktualizovat"
+      }
+    },
+    "calendar": {
+      "deliveries": {
+        "name": "Doručení"
       }
     },
     "sensor": {

@@ -54,6 +54,39 @@ async def test_diagnostics_redacts_and_counts(hass):
     assert incoming["raw"]["ownership"] == "OWNER"
 
 
+async def test_diagnostics_redacts_tracking_source_fields(hass):
+    """The website tracking payload's own identifying fields must be redacted too."""
+    entry = MagicMock()
+    entry.data = {"source": "tracking"}
+    entry.options = {"parcels": [{"barcode": "10000000009", "direction": "incoming"}]}
+    parcel = {
+        "barcode": "10000000009",
+        "status": "in_transit",
+        "sender": "Example Sender",
+        "pickup_point": "Example Pickup Point",
+        "url": "https://www.ppl.cz/vyhledat-zasilku?shipmentId=10000000009",
+        "raw": {
+            "phase": "ShipmentInTransport",
+            "cod": None,
+        },
+    }
+    entry.runtime_data.coordinator.data = [parcel]
+    entry.runtime_data.coordinator.delivered = []
+    entry.runtime_data.coordinator.outgoing = []
+    entry.runtime_data.coordinator.delivered_outgoing = []
+    entry.runtime_data.coordinator.current_tier_minutes = 15
+    entry.runtime_data.coordinator.update_interval = timedelta(minutes=15)
+
+    result = await async_get_config_entry_diagnostics(None, entry)
+
+    incoming = result["incoming"][0]
+    assert incoming["barcode"] == "**REDACTED**"
+    assert incoming["sender"] == "**REDACTED**"
+    assert incoming["pickup_point"] == "**REDACTED**"
+    assert incoming["url"] == "**REDACTED**"
+    assert incoming["status"] == "in_transit"
+
+
 async def test_diagnostics_polling_handles_no_update_interval(hass):
     """A fixed-interval entry has no current tier; ``update_interval`` can
     also be ``None`` (e.g. before the first successful refresh)."""

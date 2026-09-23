@@ -140,3 +140,78 @@ def events_for_delivered(code: str = INCOMING_CODE) -> list[dict]:
             "DELIVERED", "2026-04-29T13:12:42Z", message="Delivered", code="Delivered"
         ),
     ]
+
+
+# --- website tracking-by-number source --------------------------------------
+#
+# Every field here is synthetic — no real tracking code, sender/recipient
+# name, address or access-point identifier from any live probe ever appears
+# in this repo. Shapes mirror api/tracking.md's "Payload — website surface"
+# section (structure only, no captured values).
+
+TRACKING_CODE = "10000000009"
+
+
+def tracking_access_point(*, name: str = "Example Pickup Point") -> dict:
+    """A synthetic ``accessPoint`` object."""
+    return {
+        "accessPointId": "AP-TEST",
+        "code": "TEST01",
+        "depot": "10",
+        "name": name,
+        "street": "Example Street 1",
+        "city": "Testville",
+        "zipCode": "00000",
+        "country": "CZ",
+        "parcelshopName": name,
+        "gps": {"lat": 0.0, "lng": 0.0},
+        "openHours": [],
+    }
+
+
+def tracking_event(code: str, event_date: str, *, event_text: str | None = None) -> dict:
+    """A synthetic tracking-surface event entry."""
+    return {"code": code, "eventDate": event_date, "eventText": event_text}
+
+
+def tracking_shipment(
+    code: str = TRACKING_CODE,
+    *,
+    phase: str = "ShipmentInTransport",
+    access_point: dict | None = None,
+    expected_delivery_date: str | None = None,
+    events: list[dict] | None = None,
+    weight: float | None = 1.2,
+) -> dict:
+    """A synthetic website-tracking-surface response body."""
+    return {
+        "shipmentId": code,
+        "weight": weight,
+        "addresses": [
+            {"type": "SENDER", "name": "Example Sender"},
+            {"type": "RECIPIENT", "name": "Example Recipient"},
+        ],
+        "phase": phase,
+        "lastEventCode": phase,
+        "lastEventText": "Example status text",
+        "lastEventDate": events[-1]["eventDate"] if events else None,
+        "expectedDeliveryDate": expected_delivery_date,
+        "customerReference": None,
+        "cod": None,
+        "events": events or [],
+        "accessPoint": access_point,
+        "hierarchy": {"parentReference": None, "childReference": None},
+        "packagesInSet": 1,
+        "isBackToSender": False,
+    }
+
+
+def tracking_events_for_delivered() -> list[dict]:
+    """A representative event history for a delivered tracking-source parcel."""
+    return [
+        tracking_event("WaitingForShipment", "2026-05-01T08:00:00Z"),
+        tracking_event("ShipmentInTransport", "2026-05-01T20:00:00Z"),
+        tracking_event("PreparingForDelivery", "2026-05-02T05:00:00Z"),
+        tracking_event("Delivered.Parcelshop", "2026-05-02T09:00:00Z"),
+        tracking_event("Delivered", "2026-05-02T09:05:00Z"),
+    ]

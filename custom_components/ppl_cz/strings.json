@@ -4,6 +4,14 @@
     "step": {
       "user": {
         "title": "Set up PPL CZ",
+        "menu_options": {
+          "account": "Account",
+          "tracking": "Tracking codes"
+        },
+        "description": "A mojePPL account can only be signed in one place at a time. Choosing **Account** signs you out of the mojePPL app, and signing back in on the app disconnects Home Assistant until you reconnect it here. **Tracking codes** needs no account, so nothing gets signed out — but you add each parcel's barcode yourself instead of them appearing automatically."
+      },
+      "account": {
+        "title": "Set up PPL CZ",
         "description": "Enter the e-mail address of your mojePPL account. PPL CZ will send a PIN to that address.\n\nA mojePPL account has one sign-in: setting this up signs the mobile app out, and signing in to the app later disconnects Home Assistant until you reconnect it here.",
         "data": {
           "email": "E-mail address"
@@ -27,7 +35,7 @@
       "cannot_connect": "Could not reach PPL CZ. Please try again."
     },
     "abort": {
-      "already_configured": "That PPL CZ account is already set up.",
+      "already_configured": "That PPL CZ hub is already set up.",
       "reauth_successful": "PPL CZ was reauthenticated successfully.",
       "wrong_account": "That PIN is for a different PPL CZ account. Sign in with the account this entry was set up for."
     }
@@ -36,6 +44,11 @@
     "step": {
       "init": {
         "title": "PPL CZ options",
+        "menu_options": {
+          "incoming_parcels": "Incoming parcels",
+          "outgoing_parcels": "Outgoing parcels",
+          "settings": "Settings"
+        },
         "sections": {
           "delivered": {
             "name": "Delivered parcels",
@@ -54,11 +67,42 @@
               "include_history": "Include status history"
             },
             "data_description": {
-              "include_history": "Add a per-parcel history attribute listing each status update (timestamp, status, original text). Costs one extra request per parcel per refresh. Off by default."
+              "include_history": "Add a per-parcel history attribute listing each status update (timestamp, status, original text). Off by default."
             }
           }
         }
+      },
+      "incoming_parcels": {
+        "title": "Manage incoming parcels",
+        "description": "Tracking codes for parcels you are expecting. PPL CZ's tracking data cannot tell a parcel you sent from one you are receiving, so file each code in the list it belongs to.",
+        "data": {
+          "tracking_codes": "Tracking codes"
+        },
+        "data_description": {
+          "tracking_codes": "The PPL CZ tracking code(s), as printed on the shipping confirmation or the delivery notice."
+        }
+      },
+      "outgoing_parcels": {
+        "title": "Manage outgoing parcels",
+        "description": "Tracking codes for parcels you sent. They are counted and reported separately, so they stay out of your incoming parcel count.",
+        "data": {
+          "tracking_codes": "Tracking codes"
+        },
+        "data_description": {
+          "tracking_codes": "The PPL CZ tracking code(s), as printed on the shipping confirmation."
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "delivered_filter_type": "Delivered parcels: filter by",
+          "delivered_filter_amount": "Delivered parcels: amount",
+          "include_history": "Include status history"
+        }
       }
+    },
+    "error": {
+      "invalid_tracking_code": "Enter at least one tracking code."
     }
   },
   "selector": {
@@ -82,6 +126,11 @@
     "button": {
       "refresh": {
         "name": "Refresh"
+      }
+    },
+    "calendar": {
+      "deliveries": {
+        "name": "Deliveries"
       }
     },
     "sensor": {

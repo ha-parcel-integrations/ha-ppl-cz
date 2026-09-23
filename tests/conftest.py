@@ -22,6 +22,7 @@ def reset_one_shot_warnings():
     depend on test order.
     """
     from custom_components.ppl_cz.account import parcels
+    from custom_components.ppl_cz.tracking import parcels as tracking_parcels
 
     parcels._unmapped_statuses_logged.clear()
     parcels._items_shape_logged = False
@@ -29,6 +30,7 @@ def reset_one_shot_warnings():
     parcels._delivery_info_shape_logged = False
     parcels._delivery_point_type_logged = False
     parcels._unknown_direction_logged.clear()
+    tracking_parcels._unmapped_statuses_logged.clear()
     yield
 
 

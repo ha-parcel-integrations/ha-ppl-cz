@@ -6,14 +6,22 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ppl_cz.api import PPLCZApiError, PPLCZAuthError
+from custom_components.ppl_cz.account.api import PPLCZApiError, PPLCZAuthError
+from custom_components.ppl_cz.account.coordinator import PPLCZCoordinator
 from custom_components.ppl_cz.const import (
     CONF_ACCESS_TOKEN,
+    CONF_BARCODE,
+    CONF_DIRECTION,
     CONF_EMAIL,
+    CONF_PARCELS,
+    CONF_SOURCE,
+    DIRECTION_INCOMING,
     DOMAIN,
+    SOURCE_TRACKING,
 )
+from custom_components.ppl_cz.tracking.coordinator import PPLCZTrackingCoordinator
 
-from .payloads import incoming_shipment
+from .payloads import TRACKING_CODE, incoming_shipment, tracking_shipment
 
 EMAIL = "user@example.test"
 
@@ -172,3 +180,80 @@ async def test_per_parcel_sensor_spawn_and_remove(hass):
             )
             is None
         )
+
+
+# --- source dispatch ---------------------------------------------------------
+
+
+async def test_missing_conf_source_defaults_to_an_account_hub(hass):
+    """The tripwire: a pre-0.12.0 entry has no CONF_SOURCE at all.
+
+    Getting the default backwards would silently convert every existing
+    user's account hub into an empty tracking hub on upgrade.
+    """
+    entry = _entry()
+    assert CONF_SOURCE not in entry.data
+    entry.add_to_hass(hass)
+    with _patch(_client([incoming_shipment()])):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert isinstance(entry.runtime_data.coordinator, PPLCZCoordinator)
+    # No calendar entity on an account hub, even implicitly.
+    assert hass.states.get("calendar.ppl_cz_user_example_test_deliveries") is None
+
+
+def _tracking_entry(**options) -> MockConfigEntry:
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="PPL CZ (tracking codes)",
+        unique_id=f"{DOMAIN}_{SOURCE_TRACKING}",
+        data={CONF_SOURCE: SOURCE_TRACKING},
+        options={CONF_PARCELS: [], **options},
+    )
+
+
+async def test_tracking_hub_setup_and_unload(hass):
+    entry = _tracking_entry(
+        parcels=[{CONF_BARCODE: TRACKING_CODE, CONF_DIRECTION: DIRECTION_INCOMING}]
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.async_get_parcel.return_value = tracking_shipment(TRACKING_CODE)
+    with patch("custom_components.ppl_cz.PPLCZTrackingApiClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert isinstance(entry.runtime_data.coordinator, PPLCZTrackingCoordinator)
+    # A tracking hub does get a calendar entity, unlike an account hub.
+    assert hass.states.get("calendar.ppl_cz_tracking_codes_deliveries") is not None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_tracking_hub_options_update_refreshes_without_a_reload(hass):
+    entry = _tracking_entry(
+        parcels=[{CONF_BARCODE: TRACKING_CODE, CONF_DIRECTION: DIRECTION_INCOMING}]
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.async_get_parcel.return_value = tracking_shipment(
+        TRACKING_CODE, phase="WaitingForShipment"
+    )
+    with patch("custom_components.ppl_cz.PPLCZTrackingApiClient", return_value=client):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    client.async_get_parcel.return_value = tracking_shipment(
+        TRACKING_CODE, phase="ShipmentInTransport"
+    )
+    # A genuinely different options value, so HA actually fires the update
+    # listener — resubmitting an identical dict would be a no-op.
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "include_history": True}
+    )
+    await hass.async_block_till_done()
+
+    sensor = hass.states.get(f"sensor.ppl_cz_tracking_codes_parcel_{TRACKING_CODE}")
+    assert sensor.state == "in_transit"

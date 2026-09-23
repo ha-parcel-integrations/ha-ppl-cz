@@ -74,22 +74,16 @@
       },
       "incoming_parcels": {
         "title": "Inkomende pakketten beheren",
-        "description": "Trackingcodes voor pakketten die je verwacht. De trackinggegevens van PPL CZ kunnen een verzonden pakket niet onderscheiden van een ontvangen pakket, dus voeg elke code toe aan de juiste lijst.",
+        "description": "Trackingcodes voor pakketten die je verwacht.",
         "data": {
           "tracking_codes": "Trackingcodes"
-        },
-        "data_description": {
-          "tracking_codes": "De PPL CZ-trackingcode(s), zoals afgedrukt op de verzendbevestiging of het bezorgbericht."
         }
       },
       "outgoing_parcels": {
         "title": "Uitgaande pakketten beheren",
-        "description": "Trackingcodes voor pakketten die je hebt verzonden. Ze worden apart geteld en gerapporteerd, zodat ze niet meetellen bij je inkomende pakketten.",
+        "description": "Trackingcodes voor pakketten die je hebt verzonden.",
         "data": {
           "tracking_codes": "Trackingcodes"
-        },
-        "data_description": {
-          "tracking_codes": "De PPL CZ-trackingcode(s), zoals afgedrukt op de verzendbevestiging."
         }
       },
       "settings": {

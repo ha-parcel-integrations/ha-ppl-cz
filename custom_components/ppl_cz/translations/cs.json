@@ -74,22 +74,16 @@
       },
       "incoming_parcels": {
         "title": "Správa příchozích zásilek",
-        "description": "Sledovací kódy zásilek, které očekáváte. Sledovací data PPL CZ nedokážou odlišit zásilku, kterou jste odeslali, od té, kterou přijímáte, proto zadejte každý kód do správného seznamu.",
+        "description": "Sledovací kódy zásilek, které očekáváte.",
         "data": {
           "tracking_codes": "Sledovací kódy"
-        },
-        "data_description": {
-          "tracking_codes": "Sledovací kód(y) PPL CZ, jak jsou vytištěny na potvrzení odeslání nebo oznámení o doručení."
         }
       },
       "outgoing_parcels": {
         "title": "Správa odchozích zásilek",
-        "description": "Sledovací kódy zásilek, které jste odeslali. Počítají se a zobrazují samostatně, takže se nezapočítávají do vašich příchozích zásilek.",
+        "description": "Sledovací kódy zásilek, které jste odeslali.",
         "data": {
           "tracking_codes": "Sledovací kódy"
-        },
-        "data_description": {
-          "tracking_codes": "Sledovací kód(y) PPL CZ, jak jsou vytištěny na potvrzení odeslání."
         }
       },
       "settings": {

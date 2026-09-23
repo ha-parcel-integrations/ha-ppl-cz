@@ -74,22 +74,16 @@
       },
       "incoming_parcels": {
         "title": "Manage incoming parcels",
-        "description": "Tracking codes for parcels you are expecting. PPL CZ's tracking data cannot tell a parcel you sent from one you are receiving, so file each code in the list it belongs to.",
+        "description": "Tracking codes for parcels you are expecting.",
         "data": {
           "tracking_codes": "Tracking codes"
-        },
-        "data_description": {
-          "tracking_codes": "The PPL CZ tracking code(s), as printed on the shipping confirmation or the delivery notice."
         }
       },
       "outgoing_parcels": {
         "title": "Manage outgoing parcels",
-        "description": "Tracking codes for parcels you sent. They are counted and reported separately, so they stay out of your incoming parcel count.",
+        "description": "Tracking codes for parcels you sent.",
         "data": {
           "tracking_codes": "Tracking codes"
-        },
-        "data_description": {
-          "tracking_codes": "The PPL CZ tracking code(s), as printed on the shipping confirmation."
         }
       },
       "settings": {

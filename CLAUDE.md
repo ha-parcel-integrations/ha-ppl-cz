@@ -62,7 +62,7 @@ list/events endpoints, the website tracking-by-number endpoint and both
 status vocabularies. Not duplicated here; this section is integration-level
 decisions only.
 
-**Two sources, `account/` and `tracking/` subpackages (2026-09-23).**
+**Two sources, `account/` and `tracking/` subpackages.**
 Mirrors bpost's split exactly: each source owns its client, coordinator and
 normaliser under `custom_components/ppl_cz/<source>/`; `api.py`,
 `coordinator.py` and `parcels.py` at package root are re-export shims kept so
@@ -128,7 +128,7 @@ immediately exchanges that password for a bearer token pair (Azure B2C ROPC,
 re-runs the same PIN request against the stored e-mail, then falls into
 `async_step_code` again — it is not a separate flow.
 
-**Session model: re-mint from a stored password, never refresh (2026-08-23).**
+**Session model: re-mint from a stored password, never refresh.**
 PPL's B2C tenant hard-revokes the whole refresh-token lineage ~60 minutes
 after the original `grant_type=password` login, regardless of how many
 successful refreshes happened in between — confirmed live twice (see
@@ -147,7 +147,7 @@ credential, not a token, and must never appear in a diagnostics dump pasted
 into a public issue.
 
 **A `200` with a transient (non-JSON) body gets a silent retry, not a
-forced reauth (2026-08-23, widened 2026-08-24).** Observed live on the local
+forced reauth.** Observed live on the local
 dev instance: the token endpoint
 and the shipments GET both occasionally hand back a syntactically valid
 `200` whose body isn't the JSON contract, rather than a real rejection. Two
@@ -168,7 +168,7 @@ back as JSON with a proper error code and correctly still raises
 `PPLCZAuthError`.
 
 **Never put this integration on HA's shared aiohttp session — Azure B2C
-cookies poison it (2026-08-24, root cause of the above).** The HTML-error-page
+cookies poison it (root cause of the above).** The HTML-error-page
 shape turned out not to be an Azure outage at all. Once it starts, **every**
 re-mint fails until Home Assistant is restarted — and a restart is precisely
 what clears the shared cookie jar, since the access token, password and email
@@ -210,9 +210,7 @@ harmless (a fresh password grant always succeeds on its own), but a wasted
 round-trip. Both the proactive path (`_async_ensure_fresh_token`) and the
 reactive 401 retry (`_async_refresh_if_current`) acquire the lock and
 re-check the access token afterwards, so a caller that lost the race skips
-its own re-mint. The lock itself predates the session-model change (fixed
-2026-08-22 for the same race under the old refresh-token model); it carries
-over unchanged.
+its own re-mint.
 
 **The static `dhl-api-key` header is a fixed transport value, not a user
 credential.** It is shipped deliberately for this carrier only; do not treat
@@ -275,7 +273,7 @@ event-history item shape, an unmapped `lastShipmentEvent`/event `code`, a
 `toDeliveryPoint.type` value seen for the first time (the enum's members
 were never enumerated), and a shipment whose direction
 couldn't be determined. **The incoming item shape is now confirmed** — a
-real user's diagnostics (issue #1, 2026-08-22) supplied a populated
+real user's diagnostics (issue #1) supplied a populated
 `items[]` with two delivered incoming shipments, full 7-event histories and
 no unrecognised code — but **the outgoing item shape stays open**: no real
 outgoing shipment has been seen, so `toAddress`, `toDeliveryPoint` and a
@@ -285,7 +283,7 @@ was confirmed live on real parcels before it shipped, so
 `tracking/parcels.py` has no first-sighting warnings, only the one-shot
 unmapped-status warning every source in the suite carries.
 
-**`deliveryInfo` research probe (2026-09-01) — logging only, never a data
+**`deliveryInfo` research probe — logging only, never a data
 source.** `GET .../shipments/{id}/deliveryInfo` was never called live before this — its response shape, and even whether it
 answers at all, is completely unknown. Since the maintainer can't probe it
 by hand, `coordinator._probe_delivery_info` calls it once per shipment id
@@ -301,11 +299,9 @@ ETA, ever" above. If a real shape does come back, that is a build decision
 for a future session, not something to infer from the warning alone.
 
 **One credential per account — an app login and this integration evict each
-other (2026-09-22, reverses the 2026-08-22 ruling).** The mechanics doc
-originally flagged whether an HA login could log out the phone app; that was
-ruled not applicable before the repo was generated, and
-[issue #4](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/4)
-proved it wrong. The token grant's `username` is the plain e-mail address, never the device,
+other.**
+[Issue #4](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/4)
+showed that an HA login does log out the phone app. The token grant's `username` is the plain e-mail address, never the device,
 so the account has exactly **one** credential; and the app mints a fresh one
 for that same identity on every login, generating throwaway random UUIDs for
 `deviceId` and `registrationSessionId` each time exactly as `config_flow.py`
@@ -370,8 +366,7 @@ Everything not listed here follows the scaffold exactly.
 submit with **no** update listener (unchanged by the source split). The
 interval half of this divergence is gone: `CONF_REFRESH_INTERVAL` (15/30/60/
 120/240 min plus `"auto"`, Phase 1, 0.10.0) was removed in the Phase 2
-convergence (maintainer decision 2026-09-12, every remaining Phase-1 carrier
-goes unconditional), so this carrier now matches the scaffold's no-interval
+convergence (suite-wide: no user-facing interval), so this carrier now matches the scaffold's no-interval
 model — see the tripwire above; don't add the option back. **Tracking
 source**: the scaffold's own update-listener + live-refresh model, like
 bpost's tracking source and Packeta — combining a reload flow with a

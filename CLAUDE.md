@@ -57,10 +57,9 @@ left, `delivered` and `history`; the tracking options flow is a menu instead
 ## Carrier-specific notes
 
 **API mechanics live in `carrier-research/ppl-cz/api/` (private research
-repo)** — the three-call email+PIN login, the Azure AD B2C ROPC token
-exchange, both `dhl-api-key` static headers, the shipment list/events
-endpoints, the website tracking-by-number endpoint and both status
-vocabularies. Not duplicated here; this section is integration-level
+repo)** — the email+PIN login, the token exchange, the shipment
+list/events endpoints, the website tracking-by-number endpoint and both
+status vocabularies. Not duplicated here; this section is integration-level
 decisions only.
 
 **Two sources, `account/` and `tracking/` subpackages (2026-09-23).**
@@ -117,10 +116,9 @@ account concern.
   The tracking coordinator wires into the *same* outgoing sensors/events the
   account source already has (`outgoing_parcels`, `outgoing_delivered_parcels`,
   the two outgoing device triggers) rather than inventing parallel ones.
-- **The website `dhl-api-key` is a second, distinct shared secret** from the
-  mobile app's, with its own 2026-09-23 accepted-risk ruling — see the
-  transport rules below. Never let either key value appear outside
-  `const.py`.
+- **The website source sends its own fixed `dhl-api-key` header**, distinct
+  from the account source's — see the transport rules below. Never let
+  either value appear outside `const.py`.
 
 **Login is three network calls behind two user-facing steps.**
 `async_step_account` requests a PIN (`POST registrations`); `async_step_code`
@@ -135,7 +133,7 @@ PPL's B2C tenant hard-revokes the whole refresh-token lineage ~60 minutes
 after the original `grant_type=password` login, regardless of how many
 successful refreshes happened in between — confirmed live twice (see
 [issue #1](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/1)) and
-root-caused via a third APK teardown pass: the mojePPL app itself never sends
+root-caused: the mojePPL app itself never sends
 `grant_type=refresh_token` at all. It stores the PIN-exchange Azure password
 and simply re-runs the password grant whenever a request 401s. This
 integration mirrors that instead of fighting it: `config_flow.py` persists
@@ -216,14 +214,10 @@ its own re-mint. The lock itself predates the session-model change (fixed
 2026-08-22 for the same race under the old refresh-token model); it carries
 over unchanged.
 
-**The static `dhl-api-key` header is shipped deliberately.** It is
-hardcoded identically in every mojePPL install — normally the exact
-shared/extracted-secret class this suite's standing ruling refuses (bpost,
-the three UK carriers) — but the maintainer reviewed this one specifically
-and ruled it an accepted risk (2026-08-22, recorded in the research doc's
-Verdict). Do not treat this as a precedent for a future carrier; get a fresh
-ruling each time. It has never been tested whether the API would 401 without
-it — moot, since the ruling makes the question academic for this build.
+**The static `dhl-api-key` header is a fixed transport value, not a user
+credential.** It is shipped deliberately for this carrier only; do not treat
+it as a precedent for another one. Keep it out of diagnostics, fixtures, logs
+and documentation.
 
 **One list call returns both directions — split by `shipment_direction()`,
 not two endpoints.** `GET /api/v2/me/shipments?shipment_type=ALL` answers for
@@ -279,7 +273,7 @@ if either source's field support ever changes.
 values): first populated shipment-list item shape, first populated
 event-history item shape, an unmapped `lastShipmentEvent`/event `code`, a
 `toDeliveryPoint.type` value seen for the first time (the enum's members
-were never enumerated in the teardown), and a shipment whose direction
+were never enumerated), and a shipment whose direction
 couldn't be determined. **The incoming item shape is now confirmed** — a
 real user's diagnostics (issue #1, 2026-08-22) supplied a populated
 `items[]` with two delivered incoming shipments, full 7-event histories and
@@ -292,9 +286,7 @@ was confirmed live on real parcels before it shipped, so
 unmapped-status warning every source in the suite carries.
 
 **`deliveryInfo` research probe (2026-09-01) — logging only, never a data
-source.** `GET .../shipments/{id}/deliveryInfo` (per
-`carrier-research/ppl-cz/api/tracking.md`) was found by static analysis and
-never called live before this — its response shape, and even whether it
+source.** `GET .../shipments/{id}/deliveryInfo` was never called live before this — its response shape, and even whether it
 answers at all, is completely unknown. Since the maintainer can't probe it
 by hand, `coordinator._probe_delivery_info` calls it once per shipment id
 (cached in `self._delivery_info_probed`, forever — not once per poll) for
@@ -313,12 +305,11 @@ other (2026-09-22, reverses the 2026-08-22 ruling).** The mechanics doc
 originally flagged whether an HA login could log out the phone app; that was
 ruled not applicable before the repo was generated, and
 [issue #4](https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/4)
-proved it wrong. A fourth APK teardown pass settled it: the ROPC grant's
-`username` is the plain e-mail address, never the device, so the account has
-exactly **one** Azure credential; and the app mints a fresh one for that same
-identity on every login (its confirm-step DTO is literally named
-`CreatedUserResponseDto`), generating throwaway random UUIDs for `deviceId`
-and `registrationSessionId` each time exactly as `config_flow.py` does. So a
+proved it wrong. The token grant's `username` is the plain e-mail address, never the device,
+so the account has exactly **one** credential; and the app mints a fresh one
+for that same identity on every login, generating throwaway random UUIDs for
+`deviceId` and `registrationSessionId` each time exactly as `config_flow.py`
+does. So a
 mojePPL app login rotates the password stored here out from under us, and a
 setup/reauth here does the same to the phone. **This is not fixable** — the
 PIN arrives by e-mail, so reconnecting is inherently manual. It is disclosed
@@ -357,9 +348,8 @@ a parcel field.
   a `415 UnsupportedMediaType`, not a `400`. `async_get_parcel` always sends
   `json={}`, never omits the argument.
 - **No reCAPTCHA token, cookie, `Origin` or `Referer` is sent, and none is
-  needed.** The 2026-08-22 "reCAPTCHA-walled" verdict was wrong — reversed
-  2026-09-23 by re-probing with plain `curl`: the bundled React app does
-  mint a token, but the server never checks it. Do not add browser
+  needed.** A "reCAPTCHA-walled" verdict was
+  wrong: the server never checks a token. Do not add browser
   fingerprinting or a recaptcha solver here; a real `401`/`403` means the
   key was rejected, not that a captcha is needed.
 - **Not found is a `400`, matched on `detail`, never on the status alone.**

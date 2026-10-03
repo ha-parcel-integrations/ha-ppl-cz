@@ -216,9 +216,12 @@ logger:
 
 ## Related integrations
 
-This integration is part of [**ha-parcel-integrations**](https://ha-parcel-integrations.github.io/) — a family of parcel-carrier integrations that all publish the same canonical parcel format, statuses and events.
+This integration is part of [**ha-parcel-integrations**](https://ha-parcel-integrations.github.io/) — a family of
+parcel-carrier integrations that all publish the same canonical parcel format,
+statuses and events.
 
-- [**Parcel Aggregator**](https://github.com/ha-parcel-integrations/ha-parcel-aggregator) rolls every installed carrier up into one set of sensors.
+- [**Parcel Aggregator**](https://github.com/ha-parcel-integrations/ha-parcel-aggregator) rolls every installed carrier
+  up into one set of sensors.
 - Browse [the organisation](https://ha-parcel-integrations.github.io/) for the current list of supported carriers.
 
 ## Disclaimer
@@ -229,7 +232,7 @@ All third-party trademarks, trade names, product names, logos, and other brand a
 
 This integration may rely on public, unofficial, or undocumented carrier interfaces, accessed with your own account or API key where required. These may change or be withdrawn without notice and may be subject to PPL CZ's terms. Data is sent only to PPL CZ's own services or those of its group; this project operates no servers of its own. You are responsible for ensuring that your use complies with applicable law and those terms. Use is at your own risk; see the [licence](LICENSE) for warranty limitations.
 
-The account source uses the same account API as the mojePPL app, with your own account. The tracking-code source uses the same public tracking API as [ppl.cz](https://www.ppl.cz)'s own website — it needs no account, but does carry a fixed access key extracted from that site rather than one issued to you individually.
+The account source uses the same account API as the mojePPL app, with your own account. The tracking-code source uses the same public tracking API as [ppl.cz](https://www.ppl.cz)'s own website — it needs no account.
 
 ## Contributing
 

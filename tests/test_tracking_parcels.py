@@ -45,7 +45,7 @@ from .payloads import (
         ("PickedUpFromSender", ParcelStatus.IN_TRANSIT),
         ("ShipmentInTransport", ParcelStatus.IN_TRANSIT),
         ("ShipmentInTransport.TakeOverFromSender", ParcelStatus.IN_TRANSIT),
-        ("PreparingForDelivery", ParcelStatus.OUT_FOR_DELIVERY),
+        ("PreparingForDelivery", ParcelStatus.IN_TRANSIT),
         ("LoadingForDelivery", ParcelStatus.OUT_FOR_DELIVERY),
         ("OutForDelivery", ParcelStatus.OUT_FOR_DELIVERY),
         ("Delivered", ParcelStatus.DELIVERED),
@@ -59,13 +59,19 @@ def test_status_map(code, expected):
     assert map_parcel_status(code) == expected
 
 
-def test_delivered_parcelshop_is_delivered_not_awaiting_pickup():
-    """The band-ordering trap the plan names explicitly."""
-    assert map_parcel_status("Delivered.Parcelshop") == ParcelStatus.DELIVERED
+def test_delivered_parcelshop_is_awaiting_pickup_not_delivered():
+    """PPL words it "delivered to the pick-up point", not "to the recipient"."""
+    assert map_parcel_status("Delivered.Parcelshop") == ParcelStatus.AT_PICKUP_POINT
 
 
-def test_delivered_to_pickup_point_is_delivered_not_awaiting_pickup():
-    assert map_parcel_status("DeliveredToPickupPoint") == ParcelStatus.DELIVERED
+def test_delivered_to_pickup_point_is_awaiting_pickup_not_delivered():
+    assert map_parcel_status("DeliveredToPickupPoint") == ParcelStatus.AT_PICKUP_POINT
+
+
+def test_preparing_for_delivery_is_in_transit_loading_is_out_for_delivery():
+    """PPL: "in transit" for the first, "will be delivered today" for the second."""
+    assert map_parcel_status("PreparingForDelivery") == ParcelStatus.IN_TRANSIT
+    assert map_parcel_status("LoadingForDelivery") == ParcelStatus.OUT_FOR_DELIVERY
 
 
 def test_delivered_back_to_sender_is_delivered():
@@ -93,6 +99,11 @@ def test_map_event_status_none_is_null():
 
 def test_map_event_status_mapped():
     assert map_event_status("Delivered") == ParcelStatus.DELIVERED
+
+
+def test_map_event_status_pickup_point_scan_is_at_pickup_point():
+    assert map_event_status("Delivered.Parcelshop") == ParcelStatus.AT_PICKUP_POINT
+    assert map_event_status("DeliveredToPickupPoint") == ParcelStatus.AT_PICKUP_POINT
 
 
 # --- build_history -------------------------------------------------------
@@ -140,6 +151,56 @@ def test_normalize_parcel_in_transit():
     assert parcel["delivered"] is False
     assert parcel["delivered_at"] is None
     assert parcel["carrier"] == "PPL CZ"
+
+
+def test_parcelshop_as_current_status_is_awaiting_pickup():
+    """Regression: a parcel sitting in the Parcelshop used to report delivered."""
+    events = tracking_events_for_delivered()[:-1]  # up to and including Delivered.Parcelshop
+    raw = tracking_shipment(
+        phase="Delivered.Parcelshop",
+        access_point=tracking_access_point(name="Locker 1"),
+        expected_delivery_date="2026-05-02T00:00:00Z",
+        events=events,
+    )
+    parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE, include_history=True)
+    assert parcel["status"] == ParcelStatus.AT_PICKUP_POINT
+    assert parcel["delivered"] is False
+    assert parcel["delivered_at"] is None
+    assert parcel["pickup"] is True
+    assert parcel["pickup_point"] == "Locker 1"
+    assert parcel["history"][-1]["status"] == ParcelStatus.AT_PICKUP_POINT
+
+
+def test_parcelshop_in_history_of_a_collected_parcel_does_not_change_its_status():
+    """The same scan, once the parcel has been collected, is only history.
+
+    The current status comes from phase/lastEventCode, never from the event
+    list, so the mid-history drop-off cannot pull the parcel back.
+    """
+    events = tracking_events_for_delivered()
+    raw = tracking_shipment(
+        phase="Delivered",
+        access_point=tracking_access_point(name="Locker 1"),
+        events=events,
+    )
+    parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE, include_history=True)
+    assert parcel["status"] == ParcelStatus.DELIVERED
+    assert parcel["delivered"] is True
+    assert parcel["delivered_at"] == events[-1]["eventDate"]
+    assert parcel["pickup"] is False
+    assert [entry["status"] for entry in parcel["history"]] == [
+        ParcelStatus.REGISTERED,
+        ParcelStatus.IN_TRANSIT,
+        ParcelStatus.IN_TRANSIT,
+        ParcelStatus.AT_PICKUP_POINT,
+        ParcelStatus.DELIVERED,
+    ]
+
+
+def test_preparing_for_delivery_parcel_is_in_transit():
+    raw = tracking_shipment(phase="PreparingForDelivery")
+    parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)
+    assert parcel["status"] == ParcelStatus.IN_TRANSIT
 
 
 def test_normalize_parcel_delivered_sets_delivered_at_from_last_event_date():

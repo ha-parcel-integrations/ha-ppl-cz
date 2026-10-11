@@ -165,9 +165,9 @@ The `status` field is the carrier-agnostic enum shared by the whole integration 
 | Status | Meaning |
 |---|---|
 | `registered` | Announced to PPL CZ, not yet handed over |
-| `in_transit` | In PPL CZ's sorting network |
-| `out_for_delivery` | On a delivery vehicle today |
-| `at_pickup_point` | Waiting for you at a PPL Parcelshop / Parcelbox (including AlzaBox) |
+| `in_transit` | In PPL CZ's sorting network, including the leg PPL words as "in transit" just before the delivery day |
+| `out_for_delivery` | On a delivery vehicle today (PPL: "will be delivered today") |
+| `at_pickup_point` | Waiting for you at a PPL Parcelshop / Parcelbox (including AlzaBox). Feeds the *Awaiting pickup* sensor; the parcel only becomes `delivered` once it has been collected |
 | `delivered` | Delivered |
 | `returning` | Failed delivery, going back to the sender (or already back) |
 | `problem` | Cancelled or removed before shipping |

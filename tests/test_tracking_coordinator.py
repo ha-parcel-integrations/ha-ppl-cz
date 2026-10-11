@@ -33,6 +33,7 @@ from custom_components.ppl_cz.tracking.coordinator import (
     _next_update_interval,
     _stagger_minutes,
 )
+from custom_components.ppl_cz.tracking.parcels import normalize_parcel
 
 from .payloads import tracking_shipment
 
@@ -164,6 +165,44 @@ async def test_delivered_parcels_are_skipped_from_the_next_fetch(hass):
     client.async_get_parcel.reset_mock()
     await coord._async_update_data()
     client.async_get_parcel.assert_not_called()
+
+
+async def test_parcel_at_the_pickup_point_keeps_being_fetched_until_collected(hass):
+    entry = _entry([{CONF_BARCODE: CODE_A, CONF_DIRECTION: DIRECTION_INCOMING}])
+    entry.add_to_hass(hass)
+    by_code = {CODE_A: tracking_shipment(CODE_A, phase="Delivered.Parcelshop")}
+    client = _client(by_code)
+    coord = PPLCZTrackingCoordinator(hass, client, entry)
+
+    data = await coord._async_update_data()
+    assert data[0]["status"] == ParcelStatus.AT_PICKUP_POINT
+    assert coord.delivered_codes == set()
+    assert coord.delivered == []
+
+    # Collected: the next poll must still go out, and only now is it delivered.
+    by_code[CODE_A] = tracking_shipment(CODE_A, phase="Delivered")
+    client.async_get_parcel.reset_mock()
+    await coord._async_update_data()
+    client.async_get_parcel.assert_called_once()
+    assert coord.delivered_codes == {CODE_A}
+
+
+async def test_collecting_a_pickup_point_parcel_fires_the_delivered_event(hass):
+    entry = _entry([{CONF_BARCODE: CODE_A, CONF_DIRECTION: DIRECTION_INCOMING}])
+    entry.add_to_hass(hass)
+    by_code = {CODE_A: tracking_shipment(CODE_A, phase="Delivered.Parcelshop")}
+    coord = PPLCZTrackingCoordinator(hass, _client(by_code), entry)
+
+    delivered = []
+    hass.bus.async_listen(f"{DOMAIN}_parcel_delivered", lambda e: delivered.append(e))
+    await coord._async_update_data()
+    await hass.async_block_till_done()
+    assert delivered == []
+
+    by_code[CODE_A] = tracking_shipment(CODE_A, phase="Delivered")
+    await coord._async_update_data()
+    await hass.async_block_till_done()
+    assert len(delivered) == 1
 
 
 async def test_removing_a_tracked_barcode_drops_its_cache(hass):
@@ -316,6 +355,19 @@ def test_stagger_is_stable_and_bounded():
     assert a == b
     assert 0 <= a < STAGGER_MINUTES
     assert 0 <= c < STAGGER_MINUTES
+
+
+def test_preparing_for_delivery_does_not_escalate_to_the_hot_tier():
+    """PPL calls it "in transit"; only the real out-for-delivery scan polls hot."""
+    now = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    preparing = normalize_parcel(
+        tracking_shipment(phase="PreparingForDelivery"), tracking_code=CODE_A
+    )
+    loading = normalize_parcel(
+        tracking_shipment(phase="LoadingForDelivery"), tracking_code=CODE_A
+    )
+    assert _hottest_tier_minutes([preparing], now) == MID_INTERVAL_MINUTES
+    assert _hottest_tier_minutes([loading], now) == HOT_INTERVAL_MINUTES
 
 
 def test_tier_is_none_when_nothing_tracked():

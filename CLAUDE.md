@@ -120,6 +120,33 @@ account concern.
   from the account source's — see the transport rules below. Never let
   either value appear outside `const.py`.
 
+**Tracking source: a parcel in the Parcelshop is `at_pickup_point`, never
+`delivered`.** PPL words `Delivered.Parcelshop` / `DeliveredToPickupPoint` as
+"delivered to the pick-up point" and plain `Delivered` as "delivered to the
+recipient", so `tracking/parcels.py`'s `_STATUS_MAP` sends the first two to
+`AT_PICKUP_POINT`. The earlier `DELIVERED` mapping came from one sample of an
+already collected parcel, where the code is a mid-history event, and it hid
+every open one: the parcel reported `delivered`, fired the delivered event,
+and `_delivered_codes` then dropped it from the fetch, so the user never heard
+to collect it and the `awaiting_pickup` sensor stayed empty. `map_parcel_status`
+and `map_event_status` still share one table on purpose. What keeps the two
+roles apart is the input, not a second table: the current status is read only
+from the shipment's `phase`/`lastEventCode` (plain `Delivered` once collected,
+checked on three real collected parcels), never from the event list, so the
+mid-history scan can't pull a collected parcel back, while the history truthfully
+reads `at_pickup_point` then `delivered`. Do not make history say `delivered`
+for it; that would claim a delivery PPL itself says hadn't happened. Same
+reasoning moved `PreparingForDelivery` to `IN_TRANSIT` (PPL: "in transit",
+word for word like `ShipmentInTransport`); `LoadingForDelivery` ("will be
+delivered today") is the out-for-delivery scan, and since only
+`out_for_delivery` drives the hot polling tier this also ends the premature
+15-minute polling. Open edge: `Delivered.ServicePoint` is not in the table and
+falls back to bare `Delivered` through the base-code fallback, i.e. `delivered`
+again for what looks like the same pick-up-point case; map it explicitly when a
+real one is seen. `CAPABILITIES_BY_VARIANT["Tracking"]` already claims
+`pickup_point` and needed no change: `accessPoint` is populated on the collected
+parcels seen, and `pickup_point` comes from it regardless of status.
+
 **Login is three network calls behind two user-facing steps.**
 `async_step_account` requests a PIN (`POST registrations`); `async_step_code`
 confirms it (`PUT registrations/{id}` → a one-time Azure password) and

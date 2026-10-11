@@ -40,24 +40,36 @@ NEW_ISSUE_URL = (
 # parcels — a superset of the maintainer's original list. Explicitly
 # incomplete, not closed: new codes are expected, not a sign of a bug.
 #
-# Trap: "Delivered.Parcelshop" / "DeliveredToPickupPoint" is NOT the pending
-# "awaiting pickup" state. In the one real sample it is a mid-history event
-# on an already-delivered shipment (dropped at a locker, then collected) —
-# so both map to DELIVERED, never AT_PICKUP_POINT. The current vocabulary
-# has no code observed for an *open* shipment sitting at a pickup point; a
-# future one belongs here when it surfaces, not guessed at now.
+# Trap: "Delivered.Parcelshop" / "DeliveredToPickupPoint" is NOT "delivered".
+# PPL's own wording for the scan is "delivered to the pick-up point", against
+# "delivered to the recipient" for plain "Delivered" — the parcel is waiting
+# in a Parcelshop/Parcelbox, so both map to AT_PICKUP_POINT. The one real
+# sample that originally led to mapping them DELIVERED was an already
+# collected parcel, where the code is a mid-history event followed by a plain
+# "Delivered"; it said nothing about a parcel still sitting there, which is
+# why the mistake went unnoticed.
+#
+# The same table serves the shipment's current status and every history entry
+# and that is deliberate: a collected parcel's status comes from its
+# phase/lastEventCode (plain "Delivered"), never from its event list, so the
+# mid-history scan cannot drag it back to AT_PICKUP_POINT, and the history
+# honestly records the drop-off as at_pickup_point followed by delivered.
+#
+# "PreparingForDelivery" is in transit, not out for delivery: PPL words it
+# "The shipment is in transit", exactly like "ShipmentInTransport". The real
+# out-for-delivery scan is "LoadingForDelivery" ("will be delivered today").
 _STATUS_MAP: dict[str, ParcelStatus] = {
     "WaitingForShipment": ParcelStatus.REGISTERED,
     "Active": ParcelStatus.REGISTERED,
     "PickedUpFromSender": ParcelStatus.IN_TRANSIT,
     "ShipmentInTransport": ParcelStatus.IN_TRANSIT,
     "ShipmentInTransport.TakeOverFromSender": ParcelStatus.IN_TRANSIT,
-    "PreparingForDelivery": ParcelStatus.OUT_FOR_DELIVERY,
+    "PreparingForDelivery": ParcelStatus.IN_TRANSIT,
     "LoadingForDelivery": ParcelStatus.OUT_FOR_DELIVERY,
     "OutForDelivery": ParcelStatus.OUT_FOR_DELIVERY,
-    "DeliveredToPickupPoint": ParcelStatus.DELIVERED,
+    "DeliveredToPickupPoint": ParcelStatus.AT_PICKUP_POINT,
     "Delivered": ParcelStatus.DELIVERED,
-    "Delivered.Parcelshop": ParcelStatus.DELIVERED,
+    "Delivered.Parcelshop": ParcelStatus.AT_PICKUP_POINT,
     "Delivered.BackToSender": ParcelStatus.DELIVERED,
     "BackToSender": ParcelStatus.RETURNING,
     "Canceled": ParcelStatus.PROBLEM,

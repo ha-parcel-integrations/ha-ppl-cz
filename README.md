@@ -58,7 +58,11 @@ A custom Home Assistant integration for [PPL CZ](https://www.ppl.cz), one of Cze
 ### HACS (recommended)
 
 1. Open HACS and search for **PPL CZ**.
-2. Install it and restart Home Assistant.
+2. Install it and restart Home Assistant if HACS asks you to.
+
+Or click the button below to open it directly in HACS:
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ha-parcel-integrations&repository=ha-ppl-cz&category=integration)
 
 ### Manual
 
@@ -74,6 +78,10 @@ Add the integration via **Settings → Devices & Services → Add Integration �
 You can set up both at once, or either on its own — an account hub and a tracking-code hub coexist without conflict, and only one tracking-code hub is allowed (multiple mojePPL account hubs are fine, for a household with more than one account).
 
 ## Configuration
+
+[![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ppl_cz)
+
+Or set it up by hand, following the steps for your source below:
 
 ### Account
 

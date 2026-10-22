@@ -62,7 +62,7 @@ A custom Home Assistant integration for [PPL CZ](https://www.ppl.cz), one of Cze
 
 Or click the button below to open it directly in HACS:
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ha-parcel-integrations&repository=ha-ppl-cz&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ha-parcel-integrations&repository=ha-ppl-cz&category=integration)
 
 ### Manual
 
@@ -79,7 +79,7 @@ You can set up both at once, or either on its own — an account hub and a track
 
 ## Configuration
 
-[![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ppl_cz)
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ppl_cz)
 
 Or set it up by hand, following the steps for your source below:
 

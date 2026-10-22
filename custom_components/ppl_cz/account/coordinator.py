@@ -123,6 +123,8 @@ class PPLCZCoordinator(DataUpdateCoordinator[list[dict]]):
     separate endpoints (unlike DHL NL / DPD).
     """
 
+    config_entry: ConfigEntry
+
     def __init__(
         self,
         hass: HomeAssistant,

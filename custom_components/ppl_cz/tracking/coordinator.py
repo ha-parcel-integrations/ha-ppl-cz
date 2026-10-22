@@ -123,6 +123,8 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
     payload field.
     """
 
+    config_entry: ConfigEntry
+
     def __init__(
         self,
         hass: HomeAssistant,

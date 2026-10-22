@@ -19,8 +19,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import PPLCZConfigEntry
+from .account.coordinator import PPLCZCoordinator
 from .const import DOMAIN, ParcelStatus
 from .device import ATTRIBUTION, build_device_info
+from .tracking.coordinator import PPLCZTrackingCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +99,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class _SummarySensor(CoordinatorEntity, SensorEntity):
+class _SummarySensor(
+    CoordinatorEntity[PPLCZCoordinator | PPLCZTrackingCoordinator], SensorEntity
+):
     """Base for the count-of-parcels summary sensors."""
 
     _attr_has_entity_name = True
@@ -221,7 +225,9 @@ class PPLCZOutgoingDeliveredSensor(_SummarySensor):
         return list(self.coordinator.delivered_outgoing or [])
 
 
-class PPLCZParcelSensor(CoordinatorEntity, SensorEntity):
+class PPLCZParcelSensor(
+    CoordinatorEntity[PPLCZCoordinator | PPLCZTrackingCoordinator], SensorEntity
+):
     """Per-parcel sensor reporting the status of one tracked PPL CZ parcel."""
 
     _attr_has_entity_name = True
@@ -257,7 +263,9 @@ class PPLCZParcelSensor(CoordinatorEntity, SensorEntity):
         return dict(parcel) if parcel else {}
 
 
-class PPLCZLastUpdateSensor(CoordinatorEntity, SensorEntity):
+class PPLCZLastUpdateSensor(
+    CoordinatorEntity[PPLCZCoordinator | PPLCZTrackingCoordinator], SensorEntity
+):
     """Diagnostic sensor reporting when PPL CZ was last polled successfully."""
 
     _attr_has_entity_name = True

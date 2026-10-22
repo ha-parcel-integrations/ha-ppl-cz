@@ -54,11 +54,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> boo
     entry.async_on_unload(session.close)
 
     if source == SOURCE_TRACKING:
-        client: PPLCZApiClient | PPLCZTrackingApiClient = PPLCZTrackingApiClient(
-            session
-        )
+        tracking_client = PPLCZTrackingApiClient(session)
+        client: PPLCZApiClient | PPLCZTrackingApiClient = tracking_client
         coordinator: PPLCZCoordinator | PPLCZTrackingCoordinator = (
-            PPLCZTrackingCoordinator(hass, client, entry)
+            PPLCZTrackingCoordinator(hass, tracking_client, entry)
         )
     else:
         email = entry.data.get(CONF_EMAIL)

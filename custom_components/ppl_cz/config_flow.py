@@ -104,9 +104,9 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialise transient flow state."""
-        self._email: str | None = None
-        self._device_id: str | None = None
-        self._registration_session_id: str | None = None
+        self._email = ""
+        self._device_id = ""
+        self._registration_session_id = ""
         self._reauth_entry: ConfigEntry | None = None
 
     @staticmethod
@@ -216,12 +216,15 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
                 # restart — PPL's B2C tenant hard-revokes the refresh-token
                 # lineage ~1h after login regardless, and the app itself
                 # re-mints from this same stored credential (see api.py).
+                expires_at = client.token_expires_at
                 data = {
                     CONF_SOURCE: SOURCE_ACCOUNT,
                     CONF_EMAIL: self._email,
                     CONF_PASSWORD: password,
                     CONF_ACCESS_TOKEN: client.access_token,
-                    CONF_TOKEN_EXPIRES_AT: client.token_expires_at.isoformat(),
+                    CONF_TOKEN_EXPIRES_AT: expires_at.isoformat()
+                    if expires_at
+                    else None,
                 }
                 if self._reauth_entry is not None:
                     self._abort_if_unique_id_mismatch(reason="wrong_account")
@@ -255,7 +258,7 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         expire and this entry point is never reached from a tracking entry.
         """
         self._reauth_entry = self._get_reauth_entry()
-        self._email = entry_data.get(CONF_EMAIL)
+        self._email = entry_data.get(CONF_EMAIL, "")
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(

@@ -409,6 +409,7 @@ class PPLCZApiClient:
             raise
         except (PPLCZApiError, aiohttp.ClientError):
             return None
+        events: object
         if isinstance(payload, list):
             events = payload
         elif isinstance(payload, dict):

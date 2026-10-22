@@ -18,7 +18,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import PPLCZConfigEntry
+from .account.coordinator import PPLCZCoordinator
 from .device import ATTRIBUTION, build_device_info
+from .tracking.coordinator import PPLCZTrackingCoordinator
 from .tracking.parcels import parse_iso
 
 PARALLEL_UPDATES = 0
@@ -35,7 +37,9 @@ async def async_setup_entry(
     async_add_entities([PPLCZDeliveriesCalendar(entry.runtime_data.coordinator, entry)])
 
 
-class PPLCZDeliveriesCalendar(CoordinatorEntity, CalendarEntity):
+class PPLCZDeliveriesCalendar(
+    CoordinatorEntity[PPLCZCoordinator | PPLCZTrackingCoordinator], CalendarEntity
+):
     """A read-only calendar of expected PPL CZ deliveries.
 
     Each active tracked parcel with a known ``expectedDeliveryDate`` becomes
@@ -46,7 +50,11 @@ class PPLCZDeliveriesCalendar(CoordinatorEntity, CalendarEntity):
     _attr_translation_key = "deliveries"
     _attr_attribution = ATTRIBUTION
 
-    def __init__(self, coordinator, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        coordinator: PPLCZCoordinator | PPLCZTrackingCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
         """Initialize the calendar."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_deliveries"

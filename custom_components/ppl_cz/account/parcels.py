@@ -11,10 +11,11 @@ real shipment was available at build time — so every lookup here is guarded
 rather than trusted, and the one-shot warnings below exist specifically to
 get a real payload's shape reported once a user hits one.
 """
+
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -144,7 +145,7 @@ def note_items_shape(items: list[dict]) -> None:
     live; it's the *item* fields inside it that are still
     ``payload: reconstructed``.
     """
-    global _items_shape_logged
+    global _items_shape_logged  # noqa: PLW0603 - warn-once flag
     if _items_shape_logged or not items:
         return
     _items_shape_logged = True
@@ -161,7 +162,7 @@ def note_items_shape(items: list[dict]) -> None:
 
 def note_events_shape(events: list[dict]) -> None:
     """One-shot: report an event-history item's shape the first time it's non-empty."""
-    global _events_shape_logged
+    global _events_shape_logged  # noqa: PLW0603 - warn-once flag
     if _events_shape_logged or not events:
         return
     _events_shape_logged = True
@@ -185,7 +186,7 @@ def note_delivery_info_shape(payload: dict) -> None:
     ever" note for why the integration otherwise has nothing to put in
     `planned_from`/`planned_to`.
     """
-    global _delivery_info_shape_logged
+    global _delivery_info_shape_logged  # noqa: PLW0603 - warn-once flag
     if _delivery_info_shape_logged or not payload:
         return
     _delivery_info_shape_logged = True
@@ -205,7 +206,7 @@ def _note_delivery_point_type(point_type: str) -> None:
 
     The enum's members were never enumerated during the teardown.
     """
-    global _delivery_point_type_logged
+    global _delivery_point_type_logged  # noqa: PLW0603 - warn-once flag
     if _delivery_point_type_logged:
         return
     _delivery_point_type_logged = True
@@ -264,11 +265,11 @@ def parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(value))
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 
@@ -283,7 +284,7 @@ def to_iso_timestamp(value: Any) -> str | None:
         return None
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(value / 1000, tz=timezone.utc).isoformat()
+            return datetime.fromtimestamp(value / 1000, tz=UTC).isoformat()
         except (OverflowError, OSError, ValueError):
             return None
     return str(value)
@@ -480,14 +481,12 @@ def apply_delivered_filter(parcels: list[dict], entry: ConfigEntry) -> list[dict
     shows.
     """
     options = entry.options
-    filter_type = options.get(
-        CONF_DELIVERED_FILTER_TYPE, DEFAULT_DELIVERED_FILTER_TYPE
-    )
+    filter_type = options.get(CONF_DELIVERED_FILTER_TYPE, DEFAULT_DELIVERED_FILTER_TYPE)
     amount = int(
         options.get(CONF_DELIVERED_FILTER_AMOUNT, DEFAULT_DELIVERED_FILTER_AMOUNT)
     )
     if filter_type == "days":
-        cutoff = datetime.now(timezone.utc) - timedelta(days=amount)
+        cutoff = datetime.now(UTC) - timedelta(days=amount)
         return [
             parcel
             for parcel in parcels

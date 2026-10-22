@@ -5,6 +5,7 @@ One place, because sensors, the button and the calendar must all land on the
 here, several devices can exist: one per configured account, plus at most
 one tracking-codes device.
 """
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry

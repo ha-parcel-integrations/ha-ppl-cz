@@ -1,4 +1,5 @@
 """Tests for the website tracking-by-number API client."""
+
 import aiohttp
 import pytest
 

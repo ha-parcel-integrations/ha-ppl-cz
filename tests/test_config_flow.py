@@ -1,5 +1,6 @@
 """Tests for the PPL CZ config, reauth and options flows."""
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_PASSWORD
@@ -34,7 +35,7 @@ def _mock_client(**overrides) -> MagicMock:
     client.async_confirm_pin = AsyncMock(return_value="onetimepass")
     client.async_exchange_password = AsyncMock()
     client.access_token = "access-abc"
-    client.token_expires_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    client.token_expires_at = datetime(2026, 1, 1, tzinfo=UTC)
     for key, value in overrides.items():
         setattr(client, key, value)
     return client
@@ -365,7 +366,11 @@ async def test_tracking_options_menu_offers_incoming_outgoing_and_settings(hass)
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "menu"
-    assert result["menu_options"] == ["incoming_parcels", "outgoing_parcels", "settings"]
+    assert result["menu_options"] == [
+        "incoming_parcels",
+        "outgoing_parcels",
+        "settings",
+    ]
 
 
 async def test_incoming_parcels_step_adds_a_barcode_as_incoming(hass):
@@ -419,9 +424,7 @@ async def test_editing_one_direction_leaves_the_other_intact(hass):
         result["flow_id"], {"tracking_codes": ["INCOME2"]}
     )
 
-    codes = {
-        (p[CONF_BARCODE], p[CONF_DIRECTION]) for p in result["data"][CONF_PARCELS]
-    }
+    codes = {(p[CONF_BARCODE], p[CONF_DIRECTION]) for p in result["data"][CONF_PARCELS]}
     assert codes == {
         ("INCOME2", DIRECTION_INCOMING),
         ("OUTGO1", DIRECTION_OUTGOING),

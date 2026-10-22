@@ -21,6 +21,7 @@ hierarchy is deliberately **not** done here — this route has no credential at
 all, so nothing can expire and there is no auth-error path. A rejected key is
 a compatibility failure, never a reason to raise into reauth.
 """
+
 from __future__ import annotations
 
 import logging

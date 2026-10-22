@@ -15,15 +15,15 @@ Two sources, picked from a menu (``async_step_user``):
   there is nothing to validate without a barcode, which is added afterwards
   through the options flow.
 """
+
 from __future__ import annotations
 
-import logging
-import uuid
 from collections.abc import Mapping
+import logging
 from typing import Any
+import uuid
 
 import aiohttp
-import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -34,13 +34,9 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
+import voluptuous as vol
 
-from .account.api import (
-    PPLCZApiClient,
-    PPLCZApiError,
-    PPLCZAuthError,
-    PPLCZInvalidPin,
-)
+from .account.api import PPLCZApiClient, PPLCZApiError, PPLCZAuthError, PPLCZInvalidPin
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_BARCODE,
@@ -173,7 +169,9 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
             # confirmed working; nothing requires that specific format.
             device_id = str(uuid.uuid4())
             registration_session_id = str(uuid.uuid4())
-            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
+            client = PPLCZApiClient(
+                async_create_ppl_session(self.hass, auto_cleanup=True)
+            )
             try:
                 await client.async_request_pin(
                     email, device_id, registration_session_id
@@ -196,7 +194,9 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 2: confirm the PIN and mint the account's token pair."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
+            client = PPLCZApiClient(
+                async_create_ppl_session(self.hass, auto_cleanup=True)
+            )
             try:
                 password = await client.async_confirm_pin(
                     self._registration_session_id,
@@ -266,7 +266,9 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._device_id = str(uuid.uuid4())
             self._registration_session_id = str(uuid.uuid4())
-            client = PPLCZApiClient(async_create_ppl_session(self.hass, auto_cleanup=True))
+            client = PPLCZApiClient(
+                async_create_ppl_session(self.hass, auto_cleanup=True)
+            )
             try:
                 await client.async_request_pin(
                     self._email, self._device_id, self._registration_session_id
@@ -319,9 +321,7 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
             # Reload so a changed option takes effect immediately. No update
             # listener is registered for account entries — combining the two
             # is deprecated.
-            self.hass.config_entries.async_schedule_reload(
-                self.config_entry.entry_id
-            )
+            self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
             return self.async_create_entry(
                 title="",
                 data={

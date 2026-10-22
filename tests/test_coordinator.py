@@ -1,11 +1,12 @@
 """Tests for the PPL CZ coordinator: fetch, split, cache and events."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
-import pytest
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ppl_cz.api import PPLCZApiError, PPLCZAuthError
@@ -107,9 +108,7 @@ async def test_history_enabled_fetches_and_caches_until_status_changes(hass):
     entry = _entry(**{CONF_INCLUDE_HISTORY: True})
     entry.add_to_hass(hass)
     shipment_id = incoming_shipment(IN)["id"]
-    client = _client(
-        [incoming_shipment(IN)], {shipment_id: events_for_delivered(IN)}
-    )
+    client = _client([incoming_shipment(IN)], {shipment_id: events_for_delivered(IN)})
     coord = PPLCZCoordinator(hass, client, entry)
 
     await coord._async_update_data()
@@ -129,9 +128,7 @@ async def test_history_refetches_when_status_changes(hass):
     coord = PPLCZCoordinator(hass, client, entry)
     await coord._async_update_data()
 
-    client.async_get_parcels.return_value = [
-        incoming_shipment(IN, status="DELIVERED")
-    ]
+    client.async_get_parcels.return_value = [incoming_shipment(IN, status="DELIVERED")]
     client.async_get_shipment_events.side_effect = lambda sid: events_for_delivered(IN)
     await coord._async_update_data()
 
@@ -150,9 +147,7 @@ async def test_history_call_failure_keeps_cached_history(hass):
     data = await coord._async_update_data()
     assert data[0]["history"] is not None
 
-    client.async_get_parcels.return_value = [
-        incoming_shipment(IN, status="DELIVERING")
-    ]
+    client.async_get_parcels.return_value = [incoming_shipment(IN, status="DELIVERING")]
     client.async_get_shipment_events.side_effect = lambda sid: None
     data = await coord._async_update_data()
     assert data[0]["history"] is not None
@@ -225,8 +220,11 @@ async def test_first_refresh_fires_nothing(hass):
 
     fired = []
     for suffix in (
-        "parcel_registered", "parcel_status_changed", "parcel_delivered",
-        "outgoing_parcel_status_changed", "outgoing_parcel_delivered",
+        "parcel_registered",
+        "parcel_status_changed",
+        "parcel_delivered",
+        "outgoing_parcel_status_changed",
+        "outgoing_parcel_delivered",
     ):
         hass.bus.async_listen(f"{DOMAIN}_{suffix}", lambda e: fired.append(e))
 
@@ -245,10 +243,14 @@ async def test_incoming_status_changed_event(hass):
     events = []
     hass.bus.async_listen(f"{DOMAIN}_parcel_status_changed", lambda e: events.append(e))
 
-    client.async_get_parcels.return_value = [incoming_shipment(IN, status="IN_TRANSPORT")]
+    client.async_get_parcels.return_value = [
+        incoming_shipment(IN, status="IN_TRANSPORT")
+    ]
     await coord._async_update_data()  # first refresh: suppressed
 
-    client.async_get_parcels.return_value = [incoming_shipment(IN, status="PICKUP_POINT")]
+    client.async_get_parcels.return_value = [
+        incoming_shipment(IN, status="PICKUP_POINT")
+    ]
     await coord._async_update_data()
     await hass.async_block_till_done()
 
@@ -266,7 +268,9 @@ async def test_incoming_delivered_event_only(hass):
 
     delivered, changed = [], []
     hass.bus.async_listen(f"{DOMAIN}_parcel_delivered", lambda e: delivered.append(e))
-    hass.bus.async_listen(f"{DOMAIN}_parcel_status_changed", lambda e: changed.append(e))
+    hass.bus.async_listen(
+        f"{DOMAIN}_parcel_status_changed", lambda e: changed.append(e)
+    )
 
     client.async_get_parcels.return_value = [incoming_shipment(IN, status="DELIVERING")]
     await coord._async_update_data()
@@ -328,7 +332,9 @@ async def test_outgoing_events(hass):
     assert len(delivered) == 1
 
 
-async def test_shipment_without_number_is_skipped_from_history_but_still_normalized(hass):
+async def test_shipment_without_number_is_skipped_from_history_but_still_normalized(
+    hass,
+):
     entry = _entry(**{CONF_INCLUDE_HISTORY: True})
     entry.add_to_hass(hass)
     client = AsyncMock()
@@ -346,8 +352,6 @@ async def test_shipment_without_number_is_skipped_from_history_but_still_normali
 # Dynamic polling (account-based) — pure
 # helpers
 # ---------------------------------------------------------------------------
-
-UTC = timezone.utc
 
 
 def test_quiet_window_is_midnight_to_six():
@@ -406,9 +410,7 @@ def test_tier_is_hot_when_out_for_delivery_without_planned_from():
 
 def test_tier_is_hot_when_planned_from_is_unparseable():
     now = datetime(2026, 1, 1, 12, tzinfo=UTC)
-    parcels = [
-        {"status": ParcelStatus.OUT_FOR_DELIVERY, "planned_from": "not-a-date"}
-    ]
+    parcels = [{"status": ParcelStatus.OUT_FOR_DELIVERY, "planned_from": "not-a-date"}]
     assert _hottest_tier_minutes(parcels, now) == HOT_INTERVAL_MINUTES
 
 
@@ -498,4 +500,3 @@ async def test_stays_mid_for_in_transit_only(hass):
     await coord._async_update_data()
 
     assert coord.current_tier_minutes == MID_INTERVAL_MINUTES
-

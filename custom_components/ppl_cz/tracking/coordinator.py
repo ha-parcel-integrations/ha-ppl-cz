@@ -10,12 +10,13 @@ suspend polling entirely once nothing is tracked or everything tracked is
 delivered, mirroring bpost's/Packeta's barcode-based model rather than the
 account source's "never fully stops" one.
 """
+
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -68,10 +69,9 @@ def _next_anchor(now: datetime) -> datetime:
     )
     if now < six_today:
         return six_today
-    midnight_tomorrow = (now + timedelta(days=1)).replace(
+    return (now + timedelta(days=1)).replace(
         hour=QUIET_WINDOW_START_HOUR, minute=0, second=0, microsecond=0
     )
-    return midnight_tomorrow
 
 
 def _hottest_tier_minutes(active_parcels: list[dict], now: datetime) -> int | None:
@@ -192,9 +192,7 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
     def _include_history(self) -> bool:
         """Whether the opt-in per-parcel history option is enabled."""
         return bool(
-            self.config_entry.options.get(
-                CONF_INCLUDE_HISTORY, DEFAULT_INCLUDE_HISTORY
-            )
+            self.config_entry.options.get(CONF_INCLUDE_HISTORY, DEFAULT_INCLUDE_HISTORY)
         )
 
     async def _async_update_data(self) -> list[dict]:
@@ -217,7 +215,7 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
 
         raws: dict[str, dict] = {}
         errors = 0
-        for code, result in zip(to_fetch, results):
+        for code, result in zip(to_fetch, results, strict=True):
             if isinstance(result, PPLCZTrackingNotFound):
                 # Not found is a real answer, not a fetch failure — publish
                 # it as an unknown/pending placeholder rather than keeping a
@@ -254,12 +252,16 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
             (
                 code,
                 normalize_parcel(
-                    raws.get(code, {}), tracking_code=code, include_history=include_history
+                    raws.get(code, {}),
+                    tracking_code=code,
+                    include_history=include_history,
                 ),
             )
             for code in tracked
         ]
-        self._delivered_codes = {code for code, parcel in entries if parcel["delivered"]}
+        self._delivered_codes = {
+            code for code, parcel in entries if parcel["delivered"]
+        }
 
         outgoing_codes = {
             code for code in directions if directions[code] == DIRECTION_OUTGOING
@@ -298,7 +300,7 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
         self._known_outgoing_state = self._status_map(combined_out)
 
         if not to_fetch or errors < len(to_fetch):
-            self.last_success_time = datetime.now(timezone.utc)
+            self.last_success_time = datetime.now(UTC)
 
         now = dt_util.now()
         self._current_tier_minutes = _hottest_tier_minutes(

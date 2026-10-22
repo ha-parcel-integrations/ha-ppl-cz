@@ -5,10 +5,13 @@ re-export shims when the mojePPL account source moved into ``account/``.
 Nothing in this repo imports them any more, so only a test notices if a
 rename quietly breaks a user's automation or an external import.
 """
+
 from custom_components.ppl_cz import api, coordinator, parcels
-from custom_components.ppl_cz.account import api as account_api
-from custom_components.ppl_cz.account import coordinator as account_coordinator
-from custom_components.ppl_cz.account import parcels as account_parcels
+from custom_components.ppl_cz.account import (
+    api as account_api,
+    coordinator as account_coordinator,
+    parcels as account_parcels,
+)
 
 
 def test_root_coordinator_module_re_exports_the_account_coordinator():

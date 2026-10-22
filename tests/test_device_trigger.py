@@ -1,4 +1,5 @@
 """Tests for PPL CZ device triggers."""
+
 from unittest.mock import AsyncMock, patch
 
 from custom_components.ppl_cz.const import DOMAIN

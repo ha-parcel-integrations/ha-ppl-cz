@@ -5,6 +5,7 @@ The account source's DTOs carry no ETA at all (see const.py), so it never
 forwards this platform; an account hub must never get a permanently-empty
 calendar entity.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

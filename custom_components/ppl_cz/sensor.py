@@ -1,8 +1,9 @@
 """Sensor platform for the PPL CZ parcel tracker integration."""
+
 from __future__ import annotations
 
-import logging
 from datetime import datetime
+import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -74,7 +75,7 @@ async def async_setup_entry(
             and entity_entry.unique_id.startswith(f"{entry_id}_")
             and entity_entry.unique_id not in non_parcel_unique_ids
         ):
-            barcode = entity_entry.unique_id[len(f"{entry_id}_"):]
+            barcode = entity_entry.unique_id[len(f"{entry_id}_") :]
             if barcode not in current_barcodes:
                 registry.async_remove(entity_entry.entity_id)
 
@@ -88,10 +89,10 @@ async def async_setup_entry(
         PPLCZOutgoingDeliveredSensor(coordinator, entry),
         PPLCZLastUpdateSensor(coordinator, entry),
     ]
-    for parcel in _active_parcels(coordinator):
-        entities.append(
-            PPLCZParcelSensor(coordinator, entry, parcel.get("barcode", ""))
-        )
+    entities.extend(
+        PPLCZParcelSensor(coordinator, entry, parcel.get("barcode", ""))
+        for parcel in _active_parcels(coordinator)
+    )
 
     async_add_entities(entities)
 
@@ -228,9 +229,7 @@ class PPLCZParcelSensor(CoordinatorEntity, SensorEntity):
     _attr_attribution = ATTRIBUTION
     _unrecorded_attributes = frozenset({"raw", "history"})
 
-    def __init__(
-        self, coordinator, entry: ConfigEntry, barcode: str
-    ) -> None:
+    def __init__(self, coordinator, entry: ConfigEntry, barcode: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._entry = entry

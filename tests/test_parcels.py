@@ -1,5 +1,6 @@
 """Tests for the pure parcel-mapping helpers."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -43,7 +44,7 @@ from .payloads import (
 
 
 @pytest.mark.parametrize(
-    "code,expected",
+    ("code", "expected"),
     [
         ("ORDER", ParcelStatus.REGISTERED),
         ("IN_TRANSPORT", ParcelStatus.IN_TRANSIT),
@@ -98,7 +99,7 @@ def test_pickup_point_band_does_not_conflate_with_delivered_parcelshop_code():
 
 def test_parse_iso_handles_z_naive_and_garbage():
     assert parse_iso("2026-04-29T13:12:42Z").tzinfo is not None
-    assert parse_iso("2026-04-29T13:12:42").tzinfo == timezone.utc
+    assert parse_iso("2026-04-29T13:12:42").tzinfo == UTC
     assert parse_iso("not-a-date") is None
     assert parse_iso(None) is None
 
@@ -131,9 +132,7 @@ def test_build_history_falls_back_to_message_then_event_code():
         [shipment_event("IN_TRANSPORT", "2026-04-28T10:00:00Z", message="On the way")]
     )
     assert history[0]["raw_status"] == "On the way"
-    history = build_history(
-        [shipment_event("IN_TRANSPORT", "2026-04-28T10:00:00Z")]
-    )
+    history = build_history([shipment_event("IN_TRANSPORT", "2026-04-28T10:00:00Z")])
     assert history[0]["raw_status"] == "IN_TRANSPORT"
 
 
@@ -205,9 +204,23 @@ def test_delivery_point_type_warns_once(caplog):
 # --- normalize_parcel -------------------------------------------------------
 
 CANONICAL_KEYS = [
-    "carrier", "barcode", "sender", "receiver", "status", "raw_status",
-    "delivered", "delivered_at", "planned_from", "planned_to", "pickup",
-    "pickup_point", "url", "weight", "dimensions", "history", "raw",
+    "carrier",
+    "barcode",
+    "sender",
+    "receiver",
+    "status",
+    "raw_status",
+    "delivered",
+    "delivered_at",
+    "planned_from",
+    "planned_to",
+    "pickup",
+    "pickup_point",
+    "url",
+    "weight",
+    "dimensions",
+    "history",
+    "raw",
 ]
 
 
@@ -239,7 +252,8 @@ def test_normalize_outgoing_parcel_populates_receiver_only():
 
 def test_normalize_pickup_point_and_bool():
     raw = incoming_shipment(
-        status="PICKUP_POINT", to_delivery_point=delivery_point(name="AlzaBox Wenceslas")
+        status="PICKUP_POINT",
+        to_delivery_point=delivery_point(name="AlzaBox Wenceslas"),
     )
     parcel = normalize_parcel(raw)
     assert parcel["status"] == ParcelStatus.AT_PICKUP_POINT
@@ -282,7 +296,11 @@ def test_normalize_curates_raw_fields():
     raw = incoming_shipment()
     parcel = normalize_parcel(raw)
     assert set(parcel["raw"]) == {
-        "ownership", "cod", "phaseText", "discriminator", "codPaidStatus",
+        "ownership",
+        "cod",
+        "phaseText",
+        "discriminator",
+        "codPaidStatus",
     }
     assert "toAddress" not in parcel["raw"]
     assert "toDeliveryPoint" not in parcel["raw"]
@@ -319,7 +337,7 @@ def _entry(filter_type: str, amount: int) -> MockConfigEntry:
 
 
 def _delivered_pair() -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         {"barcode": "RECENT", "delivered_at": (now - timedelta(days=1)).isoformat()},
         {"barcode": "OLD", "delivered_at": (now - timedelta(days=30)).isoformat()},
@@ -360,4 +378,4 @@ def test_tracking_capabilities_add_weight_and_delivery_window():
 
 def test_capabilities_flat_alias_matches_the_account_variant():
     """CAPABILITIES is a flat alias for any docs-site consumer expecting one set."""
-    assert CAPABILITIES == CAPABILITIES_BY_VARIANT["Account"]
+    assert CAPABILITIES_BY_VARIANT["Account"] == CAPABILITIES

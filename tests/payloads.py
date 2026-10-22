@@ -5,6 +5,7 @@ in the private mechanics doc — the test account used for the live capture had
 zero shipments. Kept in one module so a future correction (once a real
 shipment is captured) only has to change one place.
 """
+
 from __future__ import annotations
 
 INCOMING_CODE = "10000000001"
@@ -115,10 +116,19 @@ def shipments_envelope(items: list[dict]) -> dict:
 
 
 def shipment_event(
-    event_code: str, created_at: str, *, message: str | None = None, code: str | None = None
+    event_code: str,
+    created_at: str,
+    *,
+    message: str | None = None,
+    code: str | None = None,
 ) -> dict:
     """A ``ShipmentEventResponseDto`` sample."""
-    return {"event": event_code, "createdAt": created_at, "message": message, "code": code}
+    return {
+        "event": event_code,
+        "createdAt": created_at,
+        "message": message,
+        "code": code,
+    }
 
 
 def events_for_delivered(code: str = INCOMING_CODE) -> list[dict]:
@@ -134,7 +144,10 @@ def events_for_delivered(code: str = INCOMING_CODE) -> list[dict]:
             code="ShipmentInTransport.TakeOverFromSender",
         ),
         shipment_event(
-            "DELIVERING", "2026-04-29T08:46:00Z", message="Out for delivery", code="OutForDelivery"
+            "DELIVERING",
+            "2026-04-29T08:46:00Z",
+            message="Out for delivery",
+            code="OutForDelivery",
         ),
         shipment_event(
             "DELIVERED", "2026-04-29T13:12:42Z", message="Delivered", code="Delivered"
@@ -169,7 +182,9 @@ def tracking_access_point(*, name: str = "Example Pickup Point") -> dict:
     }
 
 
-def tracking_event(code: str, event_date: str, *, event_text: str | None = None) -> dict:
+def tracking_event(
+    code: str, event_date: str, *, event_text: str | None = None
+) -> dict:
     """A synthetic tracking-surface event entry."""
     return {"code": code, "eventDate": event_date, "eventText": event_text}
 

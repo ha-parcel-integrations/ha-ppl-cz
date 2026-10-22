@@ -1,6 +1,7 @@
 """Tests for the mojePPL account API client."""
+
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 import pytest
@@ -126,7 +127,9 @@ async def test_request_pin_error_raises():
 
 async def test_confirm_pin_returns_password():
     session = _Session({("put", CONFIRM_URL): [(200, REGISTRATION_CONFIRM_BODY)]})
-    password = await PPLCZApiClient(session).async_confirm_pin("reg-session-1", "1234", "dev1")
+    password = await PPLCZApiClient(session).async_confirm_pin(
+        "reg-session-1", "1234", "dev1"
+    )
     assert password == REGISTRATION_CONFIRM_BODY["password"]
 
 
@@ -157,9 +160,8 @@ async def test_confirm_pin_unparseable_body_raises():
 
 async def test_unparseable_body_logs_raw_content(caplog):
     session = _Session({("put", CONFIRM_URL): [(200, ValueError("nope"))]})
-    with caplog.at_level("DEBUG"):
-        with pytest.raises(PPLCZApiError):
-            await PPLCZApiClient(session).async_confirm_pin("reg-session-1", "1234", "dev1")
+    with caplog.at_level("DEBUG"), pytest.raises(PPLCZApiError):
+        await PPLCZApiClient(session).async_confirm_pin("reg-session-1", "1234", "dev1")
     assert "unparseable body" in caplog.text
     assert "b'x'" in caplog.text
 
@@ -170,7 +172,9 @@ async def test_unparseable_body_logs_raw_content(caplog):
 async def test_exchange_password_stores_tokens_and_reports_update():
     updated = []
     session = _Session({("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)]})
-    client = PPLCZApiClient(session, on_tokens_updated=lambda *args: updated.append(args))
+    client = PPLCZApiClient(
+        session, on_tokens_updated=lambda *args: updated.append(args)
+    )
     await client.async_exchange_password("a@b.c", "onetimepass")
 
     assert client.access_token == PASSWORD_GRANT_TOKENS["access_token"]
@@ -220,7 +224,7 @@ async def test_remint_replaces_the_access_token():
         email="a@b.c",
         password="pw",
         access_token="stale",
-        token_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        token_expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
     await client.async_get_parcels()
     assert client.access_token == REMINTED_TOKENS["access_token"]
@@ -244,7 +248,7 @@ async def test_concurrent_requests_share_a_single_remint():
         email="a@b.c",
         password="pw",
         access_token="stale",
-        token_expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        token_expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
     results = await asyncio.gather(
         client.async_get_parcels(), client.async_get_parcels()
@@ -287,9 +291,8 @@ async def test_remint_rejected_logs_azure_error_body(caplog):
     body = {"error": "invalid_grant", "error_description": "AADB2C90129: revoked"}
     session = _Session({("post", AZURE_TOKEN_URL): [(400, body)]})
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
-    with caplog.at_level("WARNING"):
-        with pytest.raises(PPLCZAuthError):
-            await client.async_get_parcels()
+    with caplog.at_level("WARNING"), pytest.raises(PPLCZAuthError):
+        await client.async_get_parcels()
     assert "invalid_grant" in caplog.text
     assert "AADB2C90129: revoked" in caplog.text
     assert "mojePPL app" in caplog.text
@@ -387,7 +390,10 @@ async def test_remint_raises_after_two_html_error_pages():
 async def test_401_triggers_one_remint_and_retry():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [
+                (200, PASSWORD_GRANT_TOKENS),
+                (200, REMINTED_TOKENS),
+            ],
             ("get", SHIPMENTS_URL): [(401, {}), (200, shipments_envelope([]))],
         }
     )
@@ -399,7 +405,10 @@ async def test_401_triggers_one_remint_and_retry():
 async def test_persistent_401_raises_auth_error():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [
+                (200, PASSWORD_GRANT_TOKENS),
+                (200, REMINTED_TOKENS),
+            ],
             ("get", SHIPMENTS_URL): [(401, {}), (401, {})],
         }
     )
@@ -448,7 +457,10 @@ async def test_authed_request_retries_once_on_html_error_page():
     session = _Session(
         {
             ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS)],
-            ("get", SHIPMENTS_URL): [(200, HTML_ERROR_PAGE), (200, shipments_envelope([]))],
+            ("get", SHIPMENTS_URL): [
+                (200, HTML_ERROR_PAGE),
+                (200, shipments_envelope([])),
+            ],
         }
     )
     client = PPLCZApiClient(session, email="a@b.c", password="pw")
@@ -551,7 +563,10 @@ async def test_get_shipment_events_outage_returns_none():
 async def test_get_shipment_events_auth_error_propagates():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [
+                (200, PASSWORD_GRANT_TOKENS),
+                (200, REMINTED_TOKENS),
+            ],
             ("get", EVENTS_URL): [(401, {}), (401, {})],
         }
     )
@@ -600,7 +615,10 @@ async def test_get_delivery_info_404_returns_none():
 async def test_get_delivery_info_auth_error_propagates():
     session = _Session(
         {
-            ("post", AZURE_TOKEN_URL): [(200, PASSWORD_GRANT_TOKENS), (200, REMINTED_TOKENS)],
+            ("post", AZURE_TOKEN_URL): [
+                (200, PASSWORD_GRANT_TOKENS),
+                (200, REMINTED_TOKENS),
+            ],
             ("get", DELIVERY_INFO_URL): [(401, {}), (401, {})],
         }
     )

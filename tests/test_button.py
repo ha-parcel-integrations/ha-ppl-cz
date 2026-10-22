@@ -1,4 +1,5 @@
 """Tests for the PPL CZ refresh button."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.ppl_cz.button import PPLCZRefreshButton

@@ -1,9 +1,10 @@
 """PPL CZ parcel tracker custom component for Home Assistant."""
+
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
@@ -39,9 +40,7 @@ class PPLCZData:
 type PPLCZConfigEntry = ConfigEntry[PPLCZData]
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: PPLCZConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> bool:
     """Set up PPL CZ from a config entry.
 
     A pre-0.12.0 entry predates ``CONF_SOURCE`` entirely — it was an account
@@ -55,9 +54,11 @@ async def async_setup_entry(
     entry.async_on_unload(session.close)
 
     if source == SOURCE_TRACKING:
-        client: PPLCZApiClient | PPLCZTrackingApiClient = PPLCZTrackingApiClient(session)
-        coordinator: PPLCZCoordinator | PPLCZTrackingCoordinator = PPLCZTrackingCoordinator(
-            hass, client, entry
+        client: PPLCZApiClient | PPLCZTrackingApiClient = PPLCZTrackingApiClient(
+            session
+        )
+        coordinator: PPLCZCoordinator | PPLCZTrackingCoordinator = (
+            PPLCZTrackingCoordinator(hass, client, entry)
         )
     else:
         email = entry.data.get(CONF_EMAIL)
@@ -117,16 +118,12 @@ async def async_setup_entry(
     return True
 
 
-async def _async_options_updated(
-    hass: HomeAssistant, entry: PPLCZConfigEntry
-) -> None:
+async def _async_options_updated(hass: HomeAssistant, entry: PPLCZConfigEntry) -> None:
     """Apply changed tracking-hub options by refreshing the coordinator."""
     await entry.runtime_data.coordinator.async_request_refresh()
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: PPLCZConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> bool:
     """Unload a PPL CZ config entry."""
     source = entry.data.get(CONF_SOURCE, SOURCE_ACCOUNT)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS[source])

@@ -1,4 +1,5 @@
 """Tests for PPL CZ diagnostics."""
+
 from datetime import timedelta
 from unittest.mock import MagicMock
 

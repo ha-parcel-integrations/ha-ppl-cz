@@ -1,5 +1,6 @@
 """Tests for the tracking-code source's status map and normalizer."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -126,7 +127,9 @@ def test_build_history_ignores_non_dict_entries():
 
 
 def test_build_history_raw_status_prefers_code_over_text():
-    events = [tracking_event("Delivered", "2026-05-02T09:05:00Z", event_text="Delivered!")]
+    events = [
+        tracking_event("Delivered", "2026-05-02T09:05:00Z", event_text="Delivered!")
+    ]
     history = build_history(events)
     assert history[0]["raw_status"] == "Delivered"
 
@@ -155,7 +158,9 @@ def test_normalize_parcel_in_transit():
 
 def test_parcelshop_as_current_status_is_awaiting_pickup():
     """Regression: a parcel sitting in the Parcelshop used to report delivered."""
-    events = tracking_events_for_delivered()[:-1]  # up to and including Delivered.Parcelshop
+    events = tracking_events_for_delivered()[
+        :-1
+    ]  # up to and including Delivered.Parcelshop
     raw = tracking_shipment(
         phase="Delivered.Parcelshop",
         access_point=tracking_access_point(name="Locker 1"),
@@ -292,10 +297,14 @@ def test_normalize_parcel_sender_from_the_live_integer_address_type():
     """The live payload keys the party on an int, not the string 'SENDER'."""
     raw = tracking_shipment()
     assert raw["addresses"][0]["type"] == 4
-    assert normalize_parcel(raw, tracking_code=TRACKING_CODE)["sender"] == "Example Sender"
+    assert (
+        normalize_parcel(raw, tracking_code=TRACKING_CODE)["sender"] == "Example Sender"
+    )
 
 
-def test_normalize_parcel_unknown_address_type_warns_once_and_leaves_sender_none(caplog):
+def test_normalize_parcel_unknown_address_type_warns_once_and_leaves_sender_none(
+    caplog,
+):
     raw = tracking_shipment()
     raw["addresses"] = [{"type": 99, "name": "Someone"}, {"type": 99, "name": "Else"}]
     with caplog.at_level("WARNING"):
@@ -307,7 +316,9 @@ def test_normalize_parcel_unknown_address_type_warns_once_and_leaves_sender_none
 def test_map_status_falls_back_to_the_base_code_before_the_dot(caplog):
     """A qualifier narrows where/how, never the phase — so the base maps it."""
     with caplog.at_level("WARNING"):
-        assert map_parcel_status("WaitingForShipment.Foreign") is ParcelStatus.REGISTERED
+        assert (
+            map_parcel_status("WaitingForShipment.Foreign") is ParcelStatus.REGISTERED
+        )
     assert "Unrecognised" not in caplog.text
 
 
@@ -349,11 +360,11 @@ def test_parse_iso_none_returns_none():
 
 def test_parse_iso_naive_value_treated_as_utc():
     parsed = parse_iso("2026-05-02T09:05:00")
-    assert parsed.tzinfo is timezone.utc
+    assert parsed.tzinfo is UTC
 
 
 def test_to_iso_timestamp_epoch_milliseconds():
-    assert to_iso_timestamp(0) == datetime(1970, 1, 1, tzinfo=timezone.utc).isoformat()
+    assert to_iso_timestamp(0) == datetime(1970, 1, 1, tzinfo=UTC).isoformat()
 
 
 def test_to_iso_timestamp_overflow_returns_none():
@@ -414,7 +425,7 @@ def _entry(filter_type: str, amount: int) -> MockConfigEntry:
 
 
 def test_delivered_filter_by_days():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     parcels = [
         {"barcode": "RECENT", "delivered_at": (now - timedelta(days=1)).isoformat()},
         {"barcode": "OLD", "delivered_at": (now - timedelta(days=30)).isoformat()},

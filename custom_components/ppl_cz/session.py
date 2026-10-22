@@ -5,6 +5,7 @@ source hits ``api.dhl.com/ecs/ppl/webapi`` (not Azure), where no cookie is
 wanted either, so both sources create their session from here rather than
 each carrying their own cookie-jar logic.
 """
+
 from __future__ import annotations
 
 import aiohttp

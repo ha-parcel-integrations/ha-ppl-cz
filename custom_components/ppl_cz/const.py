@@ -1,4 +1,5 @@
 """Constants for the PPL CZ parcel tracker integration."""
+
 from enum import StrEnum
 
 from homeassistant.const import Platform
@@ -16,14 +17,14 @@ class ParcelStatus(StrEnum):
     roughly the order a parcel moves through.
     """
 
-    REGISTERED = "registered"               # Sender announced the parcel; not handed over yet
-    IN_TRANSIT = "in_transit"               # In the carrier's network
-    OUT_FOR_DELIVERY = "out_for_delivery"   # On a delivery vehicle today
-    AT_PICKUP_POINT = "at_pickup_point"     # Ready to collect at a pickup location
-    DELIVERED = "delivered"                 # Handed over
-    RETURNING = "returning"                 # Failed delivery, going back to sender
-    PROBLEM = "problem"                     # Carrier reports an exception/issue
-    UNKNOWN = "unknown"                     # Raw status we have not mapped yet
+    REGISTERED = "registered"  # Sender announced the parcel; not handed over yet
+    IN_TRANSIT = "in_transit"  # In the carrier's network
+    OUT_FOR_DELIVERY = "out_for_delivery"  # On a delivery vehicle today
+    AT_PICKUP_POINT = "at_pickup_point"  # Ready to collect at a pickup location
+    DELIVERED = "delivered"  # Handed over
+    RETURNING = "returning"  # Failed delivery, going back to sender
+    PROBLEM = "problem"  # Carrier reports an exception/issue
+    UNKNOWN = "unknown"  # Raw status we have not mapped yet
 
 
 # Two independently configured sources, chosen at setup (config_flow.py's
@@ -74,7 +75,9 @@ KNOWN_CAPABILITIES = frozenset(
 # already metric) and a real expectedDeliveryDate; still no dimensions.
 CAPABILITIES_BY_VARIANT = {
     "Account": frozenset({"pickup_point", "url", "history"}),
-    "Tracking": frozenset({"weight", "delivery_window", "pickup_point", "url", "history"}),
+    "Tracking": frozenset(
+        {"weight", "delivery_window", "pickup_point", "url", "history"}
+    ),
 }
 CAPABILITIES = CAPABILITIES_BY_VARIANT["Account"]
 
@@ -103,10 +106,14 @@ CAPABILITIES = CAPABILITIES_BY_VARIANT["Account"]
 # account".
 API_BASE = "https://api.dhl.com/ecs/ppl/mobapp"
 REGISTRATIONS_URL = f"{API_BASE}/api/v1/registrations"
-REGISTRATION_CONFIRM_URL = f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
+REGISTRATION_CONFIRM_URL = (
+    f"{API_BASE}/api/v1/registrations/{{registration_session_id}}"
+)
 SHIPMENTS_URL = f"{API_BASE}/api/v2/me/shipments?shipment_type=ALL"
 SHIPMENT_EVENTS_URL = f"{API_BASE}/api/v1/me/shipments/{{shipment_id}}/events"
-SHIPMENT_DELIVERY_INFO_URL = f"{API_BASE}/api/v1/me/shipments/{{shipment_id}}/deliveryInfo"
+SHIPMENT_DELIVERY_INFO_URL = (
+    f"{API_BASE}/api/v1/me/shipments/{{shipment_id}}/deliveryInfo"
+)
 
 # Every /mobapp call also carries this static, shared key — identical across
 # every install of the mojePPL app, not a per-user or per-device credential.

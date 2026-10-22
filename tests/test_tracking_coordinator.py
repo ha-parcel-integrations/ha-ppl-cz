@@ -1,9 +1,10 @@
 """Tests for the tracking-code coordinator: fetch, direction split, events."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
-import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ppl_cz.const import (
@@ -36,8 +37,6 @@ from custom_components.ppl_cz.tracking.coordinator import (
 from custom_components.ppl_cz.tracking.parcels import normalize_parcel
 
 from .payloads import tracking_shipment
-
-UTC = timezone.utc
 
 CODE_A = "10000000001"
 CODE_B = "20000000002"
@@ -212,7 +211,9 @@ async def test_removing_a_tracked_barcode_drops_its_cache(hass):
     coord = PPLCZTrackingCoordinator(hass, client, entry)
     await coord._async_update_data()
 
-    hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_PARCELS: []})
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_PARCELS: []}
+    )
     await coord._async_update_data()
     assert coord.delivered_codes == set()
 
@@ -389,9 +390,7 @@ def test_tier_is_hot_when_out_for_delivery_without_planned_from():
 
 def test_tier_is_hot_when_planned_from_is_unparseable():
     now = datetime(2026, 1, 1, 12, tzinfo=UTC)
-    parcels = [
-        {"status": ParcelStatus.OUT_FOR_DELIVERY, "planned_from": "not-a-date"}
-    ]
+    parcels = [{"status": ParcelStatus.OUT_FOR_DELIVERY, "planned_from": "not-a-date"}]
     assert _hottest_tier_minutes(parcels, now) == HOT_INTERVAL_MINUTES
 
 
@@ -414,7 +413,9 @@ def test_tier_is_mid_before_lookahead_of_planned_from():
 
 
 def test_next_update_interval_none_tier_suspends():
-    assert _next_update_interval(datetime(2026, 1, 1, 12, tzinfo=UTC), None, "e1") is None
+    assert (
+        _next_update_interval(datetime(2026, 1, 1, 12, tzinfo=UTC), None, "e1") is None
+    )
 
 
 def test_now_inside_quiet_window_jumps_to_next_anchor():

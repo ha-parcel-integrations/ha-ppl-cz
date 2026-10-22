@@ -1,9 +1,12 @@
 """Tests for the PPL CZ setup / unload / reauth lifecycle."""
+
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ppl_cz.account.api import PPLCZApiError, PPLCZAuthError
@@ -145,9 +148,7 @@ async def test_token_rotation_persisted(hass):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    from datetime import datetime, timezone
-
-    captured["on_tokens_updated"]("new-access", datetime.now(timezone.utc))
+    captured["on_tokens_updated"]("new-access", datetime.now(UTC))
 
     assert entry.data[CONF_ACCESS_TOKEN] == "new-access"
 
@@ -159,8 +160,6 @@ async def test_per_parcel_sensor_spawn_and_remove(hass):
     with _patch(client):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-
-        from homeassistant.helpers import entity_registry as er
 
         registry = er.async_get(hass)
         assert registry.async_get_entity_id(

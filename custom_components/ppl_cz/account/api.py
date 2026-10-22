@@ -30,12 +30,13 @@ That stored password belongs to the account, not to this install — step 2
 mints a new one for the same identity whenever anyone logs in, so signing in
 to the mobile app invalidates the one kept here, and vice versa.
 """
+
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
 
 import aiohttp
@@ -282,9 +283,7 @@ class PPLCZApiClient:
             raise PPLCZApiError("token response missing an access token")
         expires_in = _parse_expires_in(payload.get("expires_in"))
         self._access_token = access_token
-        self._token_expires_at = datetime.now(timezone.utc) + timedelta(
-            seconds=expires_in
-        )
+        self._token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
         if self._on_tokens_updated is not None:
             self._on_tokens_updated(self._access_token, self._token_expires_at)
 
@@ -303,7 +302,6 @@ class PPLCZApiClient:
         for attempt in range(2):
             try:
                 await self.async_exchange_password(self._email, self._password)
-                return
             except _TransientBodyError as err:
                 if attempt == 1:
                     raise
@@ -313,13 +311,15 @@ class PPLCZApiClient:
                 )
             except aiohttp.ClientError as err:
                 raise PPLCZApiError(f"re-mint network error ({err})") from err
+            else:
+                return
 
     def _token_is_fresh(self) -> bool:
         """Whether the access token exists and is outside the refresh margin."""
         return (
             self._access_token is not None
             and self._token_expires_at is not None
-            and datetime.now(timezone.utc) < self._token_expires_at - _REFRESH_MARGIN
+            and datetime.now(UTC) < self._token_expires_at - _REFRESH_MARGIN
         )
 
     async def _async_ensure_fresh_token(self) -> None:
@@ -333,7 +333,9 @@ class PPLCZApiClient:
             if not self._token_is_fresh():
                 await self._async_remint()
 
-    async def _async_refresh_if_current(self, observed_access_token: str | None) -> None:
+    async def _async_refresh_if_current(
+        self, observed_access_token: str | None
+    ) -> None:
         """Re-mint unless a concurrent caller already replaced the token.
 
         Guards the reactive 401 path the same way: without this, two

@@ -1,7 +1,7 @@
 """Tests for the PPL CZ coordinator: fetch, split, cache and events."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -500,3 +500,26 @@ async def test_stays_mid_for_in_transit_only(hass):
     await coord._async_update_data()
 
     assert coord.current_tier_minutes == MID_INTERVAL_MINUTES
+
+
+async def test_failed_poll_drops_the_overnight_interval(hass):
+    entry = _entry()
+    entry.add_to_hass(hass)
+    coord = PPLCZCoordinator(hass, _client([]), entry)
+    coord.update_interval = timedelta(hours=5, minutes=40)
+
+    noon = datetime(2026, 1, 15, 12, tzinfo=UTC)
+    with (
+        patch.object(coord, "_async_poll", side_effect=TimeoutError),
+        patch(
+            "custom_components.ppl_cz.account.coordinator.dt_util.now",
+            return_value=noon,
+        ),
+        pytest.raises(TimeoutError),
+    ):
+        await coord._async_update_data()
+
+    assert coord.update_interval is not None
+    assert coord.update_interval <= timedelta(
+        minutes=MID_INTERVAL_MINUTES + STAGGER_MINUTES
+    )

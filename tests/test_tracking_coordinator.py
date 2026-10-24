@@ -1,7 +1,7 @@
 """Tests for the tracking-code coordinator: fetch, direction split, events."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -532,3 +532,26 @@ async def test_outgoing_never_fires_registered(hass):
     await coord._async_update_data()
     await hass.async_block_till_done()
     assert events == []
+
+
+async def test_failed_poll_drops_the_overnight_interval(hass):
+    entry = _entry([])
+    entry.add_to_hass(hass)
+    coord = PPLCZTrackingCoordinator(hass, _client({}), entry)
+    coord.update_interval = timedelta(hours=5, minutes=40)
+
+    noon = datetime(2026, 1, 15, 12, tzinfo=UTC)
+    with (
+        patch.object(coord, "_async_poll", side_effect=TimeoutError),
+        patch(
+            "custom_components.ppl_cz.tracking.coordinator.dt_util.now",
+            return_value=noon,
+        ),
+        pytest.raises(TimeoutError),
+    ):
+        await coord._async_update_data()
+
+    assert coord.update_interval is not None
+    assert coord.update_interval <= timedelta(
+        minutes=MID_INTERVAL_MINUTES + STAGGER_MINUTES
+    )

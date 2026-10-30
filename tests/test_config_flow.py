@@ -323,7 +323,12 @@ async def test_account_options_flow(hass):
         options={},
     )
     entry.add_to_hass(hass)
-    with patch("homeassistant.config_entries.ConfigEntries.async_schedule_reload"):
+    seen = []
+    with patch.object(
+        hass.config_entries,
+        "async_schedule_reload",
+        side_effect=lambda entry_id: seen.append(dict(entry.options)),
+    ):
         result = await hass.config_entries.options.async_init(entry.entry_id)
         assert result["step_id"] == "init"
         assert result["type"] != "menu"
@@ -341,6 +346,8 @@ async def test_account_options_flow(hass):
     assert CONF_REFRESH_INTERVAL_KEY not in result["data"]
     assert result["data"][CONF_INCLUDE_HISTORY] is True
     assert result["data"][CONF_DELIVERED_FILTER_AMOUNT] == 5
+    # The reload must see the saved options, not the ones from before the form.
+    assert seen == [result["data"]]
 
 
 # --- tracking options ------------------------------------------------------
@@ -485,3 +492,21 @@ async def test_tracking_settings_step_updates_delivered_and_history(hass):
     assert result["type"] == "create_entry"
     assert result["data"][CONF_DELIVERED_FILTER_AMOUNT] == 3
     assert result["data"][CONF_INCLUDE_HISTORY] is True
+
+
+async def test_tracking_options_apply_through_the_listener_not_a_reload(hass):
+    """A tracking hub keeps its update listener, so no automatic reload."""
+    entry = _tracking_entry()
+    entry.add_to_hass(hass)
+    entry.add_update_listener(AsyncMock())
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "incoming_parcels"}
+    )
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"tracking_codes": ["12345678901"]}
+        )
+
+    assert result["type"] == "create_entry"
+    reload.assert_not_called()

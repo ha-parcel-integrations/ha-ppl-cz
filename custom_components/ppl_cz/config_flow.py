@@ -28,7 +28,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
@@ -288,11 +288,11 @@ class PPLCZConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class PPLCZOptionsFlowHandler(OptionsFlow):
+class PPLCZOptionsFlowHandler(OptionsFlowWithReload):
     """Manage each source's own options.
 
     An account hub keeps its single sectioned form (delivered retention +
-    history) with a reload on submit — unchanged from before this source
+    history) that reloads once saved — unchanged from before this source
     split. A tracking hub instead shows a menu (mirrors Packeta, the other
     account-less carrier in the suite): ``incoming_parcels``/
     ``outgoing_parcels`` each manage one direction's tracked barcode list —
@@ -307,6 +307,11 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Branch on the entry's source."""
+        # A tracking hub's update listener may not be combined with the
+        # automatic reload; an account hub reloads once the options are saved.
+        self.automatic_reload = (
+            self.config_entry.data.get(CONF_SOURCE, SOURCE_ACCOUNT) != SOURCE_TRACKING
+        )
         if self.config_entry.data.get(CONF_SOURCE, SOURCE_ACCOUNT) == SOURCE_TRACKING:
             return self.async_show_menu(
                 step_id="init",
@@ -321,10 +326,6 @@ class PPLCZOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             delivered = user_input["delivered"]
             history = user_input["history"]
-            # Reload so a changed option takes effect immediately. No update
-            # listener is registered for account entries — combining the two
-            # is deprecated.
-            self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
             return self.async_create_entry(
                 title="",
                 data={

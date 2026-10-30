@@ -109,9 +109,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> boo
         # per-parcel sensors appear and disappear immediately. This is also
         # the resume path after polling fully suspended: adding a barcode
         # back triggers this refresh, which recomputes the tier and re-arms
-        # scheduling. The account source keeps its own reload-on-submit
-        # options flow instead (unchanged) — combining a reload flow with an
-        # update listener is deprecated, so only one entry type gets each.
+        # scheduling. The account source's options flow is an
+        # OptionsFlowWithReload instead — it may not be combined with an
+        # update listener, so only one entry type gets each.
         entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     return True

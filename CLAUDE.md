@@ -389,8 +389,9 @@ a parcel field.
 
 Everything not listed here follows the scaffold exactly.
 
-*Options and reloads* — **account source**: `async_schedule_reload` on
-submit with **no** update listener (unchanged by the source split). The
+*Options and reloads* — **account source**: an `OptionsFlowWithReload` with
+**no** update listener (unchanged by the source split); the tracking hub keeps
+its listener, so its flow sets `automatic_reload = False`. The
 interval half of this divergence is gone: `CONF_REFRESH_INTERVAL` (15/30/60/
 120/240 min plus `"auto"`, Phase 1, 0.10.0) was removed in the Phase 2
 convergence (suite-wide: no user-facing interval), so this carrier now matches the scaffold's no-interval

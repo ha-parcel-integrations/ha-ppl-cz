@@ -152,10 +152,12 @@ Each hub (an account, or the one tracking-code hub) gets its own set, named afte
 | Entity | Description |
 |---|---|
 | `sensor.ppl_cz_<hub>_incoming_parcels` | Active parcels you're receiving; full list under the `parcels` attribute |
+| `sensor.ppl_cz_<hub>_awaiting_pickup` | Incoming parcels that are ready to collect at a pickup point |
 | `sensor.ppl_cz_<hub>_outgoing_parcels` | Active parcels you sent |
 | `sensor.ppl_cz_<hub>_delivered_parcels` | Recently received parcels (see the retention option) |
 | `sensor.ppl_cz_<hub>_outgoing_delivered_parcels` | Recently delivered parcels you sent |
 | `sensor.ppl_cz_<hub>_parcel_<code>` | One per active parcel (either direction); state is the canonical status, attributes carry the full normalised parcel |
+| `calendar.ppl_cz_tracking_codes_deliveries` | Read-only calendar of expected deliveries, no extra API calls (tracking-code hub only) |
 | `sensor.ppl_cz_<hub>_last_successful_update` | Diagnostic: when PPL CZ was last polled successfully |
 
 A delivered parcel moves from its per-parcel sensor to the matching delivered sensor automatically.

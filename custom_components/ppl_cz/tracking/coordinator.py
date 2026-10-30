@@ -286,17 +286,15 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
         sent = [parcel for code, parcel in entries if code in outgoing_codes]
         received = [parcel for code, parcel in entries if code not in outgoing_codes]
 
-        self.delivered = apply_delivered_filter(
-            sort_parcels_by_ts(
-                [p for p in received if p["delivered"]], "delivered_at", descending=True
-            ),
-            self.config_entry,
+        delivered_sorted = sort_parcels_by_ts(
+            [p for p in received if p["delivered"]], "delivered_at", descending=True
+        )
+        self.delivered = apply_delivered_filter(delivered_sorted, self.config_entry)
+        delivered_outgoing_sorted = sort_parcels_by_ts(
+            [p for p in sent if p["delivered"]], "delivered_at", descending=True
         )
         self.delivered_outgoing = apply_delivered_filter(
-            sort_parcels_by_ts(
-                [p for p in sent if p["delivered"]], "delivered_at", descending=True
-            ),
-            self.config_entry,
+            delivered_outgoing_sorted, self.config_entry
         )
         normalized_active = sort_parcels_by_ts(
             [p for p in received if not p["delivered"]], "planned_from"
@@ -305,14 +303,14 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
             [p for p in sent if not p["delivered"]], "planned_from"
         )
 
-        # Incoming = active + delivered, combined so the transition to
-        # delivered is visible in one set.
-        combined_in = normalized_active + self.delivered
+        # Events and remembered state cover every parcel; the retention option
+        # only limits what the delivered sensor shows.
+        combined_in = normalized_active + delivered_sorted
         self._fire_change_events(combined_in)
         self._known_state = self._status_map(combined_in)
 
         # Outgoing = active + delivered, same reasoning.
-        combined_out = self.outgoing + self.delivered_outgoing
+        combined_out = self.outgoing + delivered_outgoing_sorted
         self._fire_outgoing_change_events(combined_out)
         self._known_outgoing_state = self._status_map(combined_out)
 

@@ -523,3 +523,28 @@ async def test_failed_poll_drops_the_overnight_interval(hass):
     assert coord.update_interval <= timedelta(
         minutes=MID_INTERVAL_MINUTES + STAGGER_MINUTES
     )
+
+
+async def test_a_parcel_the_delivered_list_leaves_out_still_fires_delivered(hass):
+    """The retention option limits the delivered sensor, never the events."""
+    other = "IN-OTHER-0002"
+    entry = _entry(**{CONF_DELIVERED_FILTER_AMOUNT: 1})
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    client.async_get_shipment_events.return_value = None
+    coord = PPLCZCoordinator(hass, client, entry)
+    delivered = []
+    hass.bus.async_listen(f"{DOMAIN}_parcel_delivered", lambda e: delivered.append(e))
+
+    client.async_get_parcels.return_value = [
+        incoming_shipment(code, status="DELIVERING") for code in (IN, other)
+    ]
+    await coord._async_update_data()
+    client.async_get_parcels.return_value = [
+        incoming_shipment(code, status="DELIVERED") for code in (IN, other)
+    ]
+    await coord._async_update_data()
+    await hass.async_block_till_done()
+
+    assert sorted(e.data["barcode"] for e in delivered) == sorted([IN, other])
+    assert len(coord.delivered) == 1

@@ -555,3 +555,32 @@ async def test_failed_poll_drops_the_overnight_interval(hass):
     assert coord.update_interval <= timedelta(
         minutes=MID_INTERVAL_MINUTES + STAGGER_MINUTES
     )
+
+
+async def test_a_parcel_the_delivered_list_leaves_out_still_fires_delivered(hass):
+    """The retention option limits the delivered sensor, never the events."""
+    entry = _entry(
+        [
+            {CONF_BARCODE: CODE_A, CONF_DIRECTION: DIRECTION_INCOMING},
+            {CONF_BARCODE: CODE_B, CONF_DIRECTION: DIRECTION_INCOMING},
+        ],
+        **{CONF_DELIVERED_FILTER_AMOUNT: 1},
+    )
+    entry.add_to_hass(hass)
+    client = AsyncMock()
+    coord = PPLCZTrackingCoordinator(hass, client, entry)
+    delivered = []
+    hass.bus.async_listen(f"{DOMAIN}_parcel_delivered", lambda e: delivered.append(e))
+
+    client.async_get_parcel.side_effect = lambda code: tracking_shipment(
+        code, phase="ShipmentInTransport"
+    )
+    await coord._async_update_data()
+    client.async_get_parcel.side_effect = lambda code: tracking_shipment(
+        code, phase="Delivered"
+    )
+    await coord._async_update_data()
+    await hass.async_block_till_done()
+
+    assert sorted(e.data["barcode"] for e in delivered) == [CODE_A, CODE_B]
+    assert len(coord.delivered) == 1

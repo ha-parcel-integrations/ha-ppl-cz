@@ -5,6 +5,18 @@ labels: ["enhancement"]
 assignees:
   - peter-mdf
 body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which PPL CZ setup is this about?
+      description: The source you picked during setup, shown on the integration's entry under Settings → Devices & services → PPL CZ.
+      options:
+        - Account (automatic import)
+        - Tracking codes
+        - All of them / not setup-specific
+    validations:
+      required: true
+
   - type: textarea
     id: feature
     attributes:

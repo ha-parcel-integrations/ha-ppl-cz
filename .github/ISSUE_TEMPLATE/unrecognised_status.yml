@@ -25,6 +25,18 @@ body:
       render: text
     validations:
       required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which PPL CZ setup logged it?
+      description: The source you picked during setup, shown on the integration's entry under Settings → Devices & services → PPL CZ.
+      options:
+        - Account (automatic import)
+        - Tracking codes
+        - Not sure
+    validations:
+      required: true
+
   - type: input
     id: version
     attributes:

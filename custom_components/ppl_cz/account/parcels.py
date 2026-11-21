@@ -31,6 +31,7 @@ from ..const import (
     TRACKING_URL,
     ParcelStatus,
 )
+from ..parcel_contract import is_pickup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -352,23 +353,8 @@ def tracking_url(tracking_code: str | None) -> str | None:
     return TRACKING_URL.format(tracking_code=tracking_code)
 
 
-# Only these base-DTO fields are carried under `raw` — a deliberate, narrower
-# set than "the whole payload": address/delivery-point blocks stay out of a
-# plain sensor attribute (they're still redacted in diagnostics too, but this
-# keeps them off the entity state altogether, not just off the public issue
-# paste).
-_RAW_FIELDS = (
-    "ownership",
-    "cod",
-    "phaseText",
-    "discriminator",
-    "codPaidStatus",
-    "isWaitingForSync",
-)
-
-
 def normalize_parcel(raw: dict, *, history: list[dict] | None = None) -> dict:
-    """Return a carrier-agnostic parcel dict with curated fields under ``raw``.
+    """Return a carrier-agnostic parcel dict with the full record under ``raw``.
 
     The **keys of the returned dict are the contract**: every carrier in the
     suite returns exactly these, in this order. Set a key to ``None`` when
@@ -427,7 +413,13 @@ def normalize_parcel(raw: dict, *, history: list[dict] | None = None) -> dict:
             _note_delivery_point_type(point_type)
         pickup_point = delivery_point.get("name") or None
 
-    raw_extra = {key: raw[key] for key in _RAW_FIELDS if key in raw}
+    pickup = is_pickup(
+        isinstance(delivery_point, dict) and bool(delivery_point),
+        status,
+        (entry.get("status") for entry in history or []),
+    )
+
+    raw_extra = dict(raw)
 
     return {
         "carrier": "PPL CZ",
@@ -440,8 +432,8 @@ def normalize_parcel(raw: dict, *, history: list[dict] | None = None) -> dict:
         "delivered_at": delivered_at,
         "planned_from": None,
         "planned_to": None,
-        "pickup": status is ParcelStatus.AT_PICKUP_POINT,
-        "pickup_point": pickup_point,
+        "pickup": pickup,
+        "pickup_point": pickup_point if pickup else None,
         "url": tracking_url(tracking_code),
         "weight": None,
         "dimensions": None,

@@ -7,6 +7,7 @@ from custom_components.ppl_cz.const import ParcelStatus
 from custom_components.ppl_cz.sensor import (
     PPLCZAwaitingPickupSensor,
     PPLCZDeliveredParcelsSensor,
+    PPLCZEnRouteToPickupPointSensor,
     PPLCZIncomingParcelsSensor,
     PPLCZLastUpdateSensor,
     PPLCZOutgoingDeliveredSensor,
@@ -55,6 +56,31 @@ def test_awaiting_pickup_counts_every_parcel_at_pickup_point():
     sensor = PPLCZAwaitingPickupSensor(coordinator, _entry())
     assert sensor.native_value == 2
     assert len(sensor.extra_state_attributes["parcels"]) == 2
+
+
+def test_en_route_counts_pickup_parcels_not_yet_at_the_point():
+    def pickup_parcel(barcode, status):
+        parcel = _parcel(barcode, status)
+        parcel["pickup"] = True
+        return parcel
+
+    coordinator = _coordinator(
+        data=[
+            pickup_parcel("A", ParcelStatus.IN_TRANSIT),
+            pickup_parcel("B", ParcelStatus.OUT_FOR_DELIVERY),
+            pickup_parcel("C", ParcelStatus.AT_PICKUP_POINT),
+            pickup_parcel("D", ParcelStatus.RETURNING),
+            _parcel("E", ParcelStatus.IN_TRANSIT),
+        ]
+    )
+    en_route = PPLCZEnRouteToPickupPointSensor(coordinator, _entry())
+    awaiting = PPLCZAwaitingPickupSensor(coordinator, _entry())
+    barcodes = {p["barcode"] for p in en_route.extra_state_attributes["parcels"]}
+    assert barcodes == {"A", "B"}
+    assert en_route.native_value == 2
+    assert barcodes.isdisjoint(
+        p["barcode"] for p in awaiting.extra_state_attributes["parcels"]
+    )
 
 
 def test_awaiting_pickup_is_empty_without_parcels():

@@ -42,7 +42,7 @@ A custom Home Assistant integration for [PPL CZ](https://www.ppl.cz), one of Cze
 - **Account source**: passwordless login — sign in with your e-mail and a one-time PIN, no password stored
 - **Tracking-code source**: nothing to sign in to, so nothing to sign out of — add barcodes as you get them
 - Per-parcel sensor with the canonical status (`registered` / `in_transit` / `at_pickup_point` / `delivered` / …), PPL CZ's own status text, and a tracking deep-link
-- Summary sensors: incoming, outgoing, and recently delivered (both directions)
+- Summary sensors: incoming, en route to a pickup point, awaiting pickup, outgoing, and recently delivered (both directions)
 - A **deliveries calendar** on the tracking-code source, where a real expected delivery date is available
 - Events + device triggers for no-code automations (parcel registered / status changed / delivered, incoming and outgoing)
 - Opt-in per-parcel status history
@@ -152,6 +152,7 @@ Each hub (an account, or the one tracking-code hub) gets its own set, named afte
 | Entity | Description |
 |---|---|
 | `sensor.ppl_cz_<hub>_incoming_parcels` | Active parcels you're receiving; full list under the `parcels` attribute |
+| `sensor.ppl_cz_<hub>_en_route_to_pickup_point` | Incoming parcels that are headed for a pickup point and have not arrived yet |
 | `sensor.ppl_cz_<hub>_awaiting_pickup` | Incoming parcels that are ready to collect at a pickup point |
 | `sensor.ppl_cz_<hub>_outgoing_parcels` | Active parcels you sent |
 | `sensor.ppl_cz_<hub>_delivered_parcels` | Recently received parcels (see the retention option) |
@@ -165,7 +166,7 @@ A delivered parcel moves from its per-parcel sensor to the matching delivered se
 A **`button.ppl_cz_<hub>_refresh`** entity triggers an immediate poll outside
 the regular interval.
 
-The tracking-code hub also gets a **`calendar.ppl_cz_tracking_codes_deliveries`** entity — one event per active parcel with a known expected delivery date. The account source has no calendar entity: PPL's account API carries no delivery-date field at all.
+The tracking-code hub also gets a **`calendar.ppl_cz_tracking_codes_deliveries`** entity — one event per active parcel with a known expected delivery date. PPL CZ gives a day, so the event covers the whole day. The account source has no calendar entity: PPL's account API carries no delivery-date field at all.
 
 ## Parcel status reference
 

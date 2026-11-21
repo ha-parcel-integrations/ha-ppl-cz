@@ -145,7 +145,42 @@ falls back to bare `Delivered` through the base-code fallback, i.e. `delivered`
 again for what looks like the same pick-up-point case; map it explicitly when a
 real one is seen. `CAPABILITIES_BY_VARIANT["Tracking"]` already claims
 `pickup_point` and needed no change: `accessPoint` is populated on the collected
-parcels seen, and `pickup_point` comes from it regardless of status.
+parcels seen, and `pickup_point` is read from it whenever `pickup` is true.
+
+**Parcel contract (`parcel_contract.py`).** The window and pickup helpers
+(`planned_window`, `planned_for_status`, `is_pickup`, …) live in one module
+shared by both sources and are a verbatim copy of the suite's; never edit them
+here. Judgement calls:
+
+- **Pickup.** Both sources can deliver to a Parcelshop/Parcelbox, so both expose
+  `awaiting_pickup` and `en_route_to_pickup_point`. `pickup` is the structured
+  field first (`accessPoint` on tracking, `toDeliveryPoint` on the account list),
+  then any `at_pickup_point` status or event, and it stays true after collection.
+  The tracking source sees its events with the history option off too; the
+  account source only has them when history is on, so there a collected parcel
+  keeps `pickup` through `toDeliveryPoint`. `pickup_point` is the point's name
+  and `None` unless `pickup`.
+- **Delivery window (tracking only).** `expectedDeliveryDate` runs through
+  `planned_window` in `Europe/Prague` and is emptied at `at_pickup_point`,
+  `returning` and `delivered`. Its real shape (date or timestamp, offset) is
+  not in any captured parcel yet, so whatever arrives is stretched by the shape
+  table: a date is a whole day, a timestamp ends at 23:59:59 on the Czech day.
+  The account source has no ETA, so its window stays `None`.
+- **No `next_delivery` sensor.** Neither source has one, and none was added: the
+  account source has no ETA and the tracking source's ETA reaches the calendar
+  only. The calendar already ignored a window that ended; it now shows a
+  whole-day window as an all-day event.
+- **`Delivered.BackToSender` is `returning`, not `delivered`.** Contract says an
+  explicit delivered signal at the sender may count as delivered; here it does
+  not, because no real parcel has shown the code, so it is unproven that it
+  means "handed back at the sender". It maps on its own (not via the `Delivered`
+  base), so no delivered event fires and `delivered_at` stays `None`. Move it to
+  `delivered` once a real parcel confirms it.
+- **No `PENDING_*`.** The pickup status was seen on real parcels (tracking) and
+  the account enum has `PICKUP_POINT`; only the account `toDeliveryPoint.type`
+  values are unenumerated. `toDeliveryPoint` itself drives the account source's
+  `pickup`, and it has only been reconstructed, never seen populated on a real
+  parcel — open point until one is captured.
 
 **Login is three network calls behind two user-facing steps.**
 `async_step_account` requests a PIN (`POST registrations`); `async_step_code`
@@ -274,15 +309,11 @@ was cached (or `None`) rather than failing the whole poll or blanking the
 attribute; a genuine `PPLCZAuthError` still propagates (that's a real
 "log in again" signal, not a per-parcel hiccup).
 
-**`raw` is a curated subset, not the whole payload.** `account/parcels._RAW_FIELDS`
-exposes only `ownership`, `cod`, `phaseText`, `discriminator`,
-`codPaidStatus`, `isWaitingForSync` — per the build plan's own mapping
-table. `toAddress` / `toDeliveryPoint` are deliberately left out of the
-per-parcel sensor's `raw` attribute (not just redacted in diagnostics): a
-full delivery address has no reason to sit in a plain entity attribute
-that shows up in the HA UI and logbook. The tracking source curates its own
-`raw` the same way (`tracking/parcels._RAW_FIELDS`) — `addresses` and
-`accessPoint`'s own contents stay out for the same reason.
+**Both sources' `raw` is the full payload**, untrimmed — recipient
+and address fields are covered by diagnostics redaction (`TO_REDACT`), and
+the sensor lists `raw` in `_unrecorded_attributes`, so it never reaches the
+recorder. The tracking payload carries no code or link that opens or signs
+in to anything, so nothing is left out of it.
 
 **No ETA, ever — account source only.** PPL CZ's account DTOs carry no
 `planned_from`/`planned_to` source at all (confirmed absent from the

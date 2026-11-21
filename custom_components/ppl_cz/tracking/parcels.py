@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 
@@ -29,8 +30,11 @@ from ..const import (
     TRACKING_URL,
     ParcelStatus,
 )
+from ..parcel_contract import is_pickup, planned_for_status, planned_window
 
 _LOGGER = logging.getLogger(__name__)
+
+_PRAGUE = ZoneInfo("Europe/Prague")
 
 NEW_ISSUE_URL = (
     "https://github.com/ha-parcel-integrations/ha-ppl-cz/issues/new"
@@ -59,6 +63,9 @@ NEW_ISSUE_URL = (
 # "PreparingForDelivery" is in transit, not out for delivery: PPL words it
 # "The shipment is in transit", exactly like "ShipmentInTransport". The real
 # out-for-delivery scan is "LoadingForDelivery" ("will be delivered today").
+# "Delivered.BackToSender" stays returning, not delivered: no real parcel has
+# shown it, so it is not proven to mean "handed back at the sender", and a
+# delivered it could not confirm would fire the delivered event wrongly.
 _STATUS_MAP: dict[str, ParcelStatus] = {
     "WaitingForShipment": ParcelStatus.REGISTERED,
     "Active": ParcelStatus.REGISTERED,
@@ -71,7 +78,7 @@ _STATUS_MAP: dict[str, ParcelStatus] = {
     "DeliveredToPickupPoint": ParcelStatus.AT_PICKUP_POINT,
     "Delivered": ParcelStatus.DELIVERED,
     "Delivered.Parcelshop": ParcelStatus.AT_PICKUP_POINT,
-    "Delivered.BackToSender": ParcelStatus.DELIVERED,
+    "Delivered.BackToSender": ParcelStatus.RETURNING,
     "BackToSender": ParcelStatus.RETURNING,
     "Canceled": ParcelStatus.PROBLEM,
     "Rejected": ParcelStatus.PROBLEM,
@@ -103,12 +110,14 @@ def _lookup_status(code: str) -> ParcelStatus | None:
     parcels. A qualifier only narrows *where* or *how*, never which phase the
     parcel is in, so falling back to the base code maps a suffix nobody has
     seen yet instead of reporting ``unknown``. An explicit full-code entry
-    still wins, which is what keeps ``Delivered.BackToSender`` (delivered,
-    back at the sender) apart from bare ``BackToSender`` (still returning).
+    still wins, so ``Delivered.BackToSender`` and any suffix of it map to
+    returning rather than inheriting ``Delivered``.
     """
     mapped = _STATUS_MAP.get(code)
     if mapped is not None:
         return mapped
+    if code.startswith("Delivered.BackToSender."):
+        return ParcelStatus.RETURNING
     base, dot, _ = code.partition(".")
     return _STATUS_MAP.get(base) if dot else None
 
@@ -270,34 +279,6 @@ def _sender_from(addresses: object) -> str | None:
     return None
 
 
-# Curated subset of the tracking payload kept under `raw` — mirrors the
-# account source's own curated allowlist rather than passing the payload
-# through verbatim. `addresses` (full sender/receiver address blocks) and
-# `accessPoint`'s own contents (already summarised into `pickup_point`) stay
-# out of a plain sensor attribute.
-# Purely presentational flags the website uses to decide what to draw
-# (`showDeliveryDate`, `showParcelShop`, `showDeliveryTime`, `editMode`) say
-# nothing about the parcel, and `canPayByCard` already appears inside `cod`,
-# so none of them are here. `parcelConectNumber` repeated `externalShipmentId`
-# verbatim in every sample seen — only one of the pair is kept.
-_RAW_FIELDS = (
-    "phase",
-    "lastEventCode",
-    "lastEventText",
-    "cod",
-    "packagesInSet",
-    "isBackToSender",
-    "hierarchy",
-    "externalShipmentId",
-    "pinGenerated",
-    "eveningDelivery",
-    "deliveryChangeAllowed",
-    "shipmentRefuseAllowed",
-    "podReportVisible",
-    "ePopReportVisible",
-)
-
-
 def normalize_parcel(
     raw: dict, *, tracking_code: str, include_history: bool = False
 ) -> dict:
@@ -320,13 +301,23 @@ def normalize_parcel(
     history = build_history(events) if include_history else None
 
     delivered_at = to_iso_timestamp(raw.get("lastEventDate")) if delivered else None
-    planned_from = (
-        None if delivered else to_iso_timestamp(raw.get("expectedDeliveryDate"))
+    planned_from, planned_to = planned_for_status(
+        status,
+        *planned_window(raw.get("expectedDeliveryDate"), None, zone=_PRAGUE),
+    )
+    pickup = is_pickup(
+        bool(raw.get("accessPoint")),
+        status,
+        (
+            map_event_status(event.get("code"))
+            for event in events or []
+            if isinstance(event, dict)
+        ),
     )
 
     sender = _sender_from(raw.get("addresses"))
 
-    raw_extra = {key: raw[key] for key in _RAW_FIELDS if key in raw}
+    raw_extra = dict(raw)
 
     return {
         "carrier": "PPL CZ",
@@ -338,9 +329,9 @@ def normalize_parcel(
         "delivered": delivered,
         "delivered_at": delivered_at,
         "planned_from": planned_from,
-        "planned_to": None,
-        "pickup": status is ParcelStatus.AT_PICKUP_POINT,
-        "pickup_point": _pickup_point_name(raw.get("accessPoint")),
+        "planned_to": planned_to,
+        "pickup": pickup,
+        "pickup_point": _pickup_point_name(raw.get("accessPoint")) if pickup else None,
         "url": tracking_url(tracking_code),
         "weight": raw.get("weight"),
         "dimensions": None,

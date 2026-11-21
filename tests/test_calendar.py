@@ -1,6 +1,6 @@
 """Tests for the PPL CZ deliveries calendar (tracking source only)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import MagicMock
 
 from custom_components.ppl_cz.calendar import PPLCZDeliveriesCalendar, async_setup_entry
@@ -150,3 +150,33 @@ async def test_async_setup_entry_adds_one_calendar(hass):
     await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
     assert len(added) == 1
     assert isinstance(added[0], PPLCZDeliveriesCalendar)
+
+
+def test_whole_day_window_is_an_all_day_event():
+    cal = _cal(
+        [
+            _parcel(
+                "A",
+                planned_from="2099-05-03T00:00:00+02:00",
+                planned_to="2099-05-03T23:59:59+02:00",
+            )
+        ]
+    )
+    event = cal._events()[0]
+    assert event.start == date(2099, 5, 3)
+    assert event.end == date(2099, 5, 4)
+
+
+def test_moment_stretched_to_end_of_day_stays_timed():
+    cal = _cal(
+        [
+            _parcel(
+                "A",
+                planned_from="2099-05-03T13:00:00+02:00",
+                planned_to="2099-05-03T23:59:59+02:00",
+            )
+        ]
+    )
+    event = cal._events()[0]
+    assert isinstance(event.start, datetime)
+    assert event.end.second == 59

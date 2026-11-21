@@ -292,19 +292,13 @@ def test_normalize_active_parcel_ignores_history_delivered_timestamp():
     assert parcel["raw_status"] == "Active"
 
 
-def test_normalize_curates_raw_fields():
-    raw = incoming_shipment()
+def test_normalize_raw_is_the_full_record():
+    raw = incoming_shipment(to_delivery_point=delivery_point())
     parcel = normalize_parcel(raw)
-    assert set(parcel["raw"]) == {
-        "ownership",
-        "cod",
-        "phaseText",
-        "discriminator",
-        "codPaidStatus",
-    }
-    assert "toAddress" not in parcel["raw"]
-    assert "toDeliveryPoint" not in parcel["raw"]
-    assert "sender" not in parcel["raw"]
+    assert parcel["raw"] == raw
+    assert parcel["raw"] is not raw
+    assert parcel["raw"]["toAddress"] == raw["toAddress"]
+    assert parcel["raw"]["toDeliveryPoint"]["street"] == "Wenceslas Square 1"
 
 
 def test_normalize_history_none_when_not_fetched():

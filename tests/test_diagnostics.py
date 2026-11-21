@@ -3,7 +3,10 @@
 from datetime import timedelta
 from unittest.mock import MagicMock
 
+from custom_components.ppl_cz.account.parcels import normalize_parcel
 from custom_components.ppl_cz.diagnostics import async_get_config_entry_diagnostics
+
+from .payloads import outgoing_shipment
 
 
 async def test_diagnostics_redacts_and_counts(hass):
@@ -69,6 +72,10 @@ async def test_diagnostics_redacts_tracking_source_fields(hass):
         "raw": {
             "phase": "ShipmentInTransport",
             "cod": None,
+            "externalShipmentId": "JJD000000000000000000000000",
+            "parcelConectNumber": "10000000009",
+            "lastEventText": "Example status text",
+            "eventText": "Example event text",
         },
     }
     entry.runtime_data.coordinator.data = [parcel]
@@ -86,6 +93,13 @@ async def test_diagnostics_redacts_tracking_source_fields(hass):
     assert incoming["pickup_point"] == "**REDACTED**"
     assert incoming["url"] == "**REDACTED**"
     assert incoming["status"] == "in_transit"
+    for key in (
+        "externalShipmentId",
+        "parcelConectNumber",
+        "lastEventText",
+        "eventText",
+    ):
+        assert incoming["raw"][key] == "**REDACTED**"
 
 
 async def test_diagnostics_polling_handles_no_update_interval(hass):
@@ -105,3 +119,25 @@ async def test_diagnostics_polling_handles_no_update_interval(hass):
 
     assert result["polling"]["current_tier_minutes"] is None
     assert result["polling"]["update_interval_seconds"] is None
+
+
+async def test_diagnostics_redacts_account_raw_recipient_fields(hass):
+    """The full account `raw` carries the recipient and address; none may leak."""
+    entry = MagicMock()
+    entry.data = {}
+    entry.options = {}
+    parcel = normalize_parcel(outgoing_shipment())
+    entry.runtime_data.coordinator.data = [parcel]
+    entry.runtime_data.coordinator.delivered = []
+    entry.runtime_data.coordinator.outgoing = []
+    entry.runtime_data.coordinator.delivered_outgoing = []
+    entry.runtime_data.coordinator.current_tier_minutes = 15
+    entry.runtime_data.coordinator.update_interval = timedelta(minutes=15)
+
+    result = await async_get_config_entry_diagnostics(None, entry)
+
+    raw = result["incoming"][0]["raw"]
+    assert raw["recipient"] == "**REDACTED**"
+    assert raw["toAddress"] == "**REDACTED**"
+    assert raw["id"] == "**REDACTED**"
+    assert raw["phaseText"] == "Order created"

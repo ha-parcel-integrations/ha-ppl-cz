@@ -75,8 +75,12 @@ def test_preparing_for_delivery_is_in_transit_loading_is_out_for_delivery():
     assert map_parcel_status("LoadingForDelivery") == ParcelStatus.OUT_FOR_DELIVERY
 
 
-def test_delivered_back_to_sender_is_delivered():
-    assert map_parcel_status("Delivered.BackToSender") == ParcelStatus.DELIVERED
+def test_delivered_back_to_sender_is_returning_not_delivered():
+    assert map_parcel_status("Delivered.BackToSender") == ParcelStatus.RETURNING
+
+
+def test_unseen_back_to_sender_suffix_is_returning():
+    assert map_parcel_status("Delivered.BackToSender.Other") == ParcelStatus.RETURNING
 
 
 def test_none_code_is_silently_unknown(caplog):
@@ -192,7 +196,8 @@ def test_parcelshop_in_history_of_a_collected_parcel_does_not_change_its_status(
     assert parcel["status"] == ParcelStatus.DELIVERED
     assert parcel["delivered"] is True
     assert parcel["delivered_at"] == events[-1]["eventDate"]
-    assert parcel["pickup"] is False
+    assert parcel["pickup"] is True
+    assert parcel["pickup_point"] == "Locker 1"
     assert [entry["status"] for entry in parcel["history"]] == [
         ParcelStatus.REGISTERED,
         ParcelStatus.IN_TRANSIT,
@@ -224,7 +229,7 @@ def test_normalize_parcel_active_parcel_gets_expected_delivery_date():
     )
     parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)
     assert parcel["planned_from"] == "2026-05-03T00:00:00Z"
-    assert parcel["planned_to"] is None
+    assert parcel["planned_to"] == "2026-05-03T23:59:59+02:00"
 
 
 def test_normalize_parcel_weight_passes_through_unconverted():
@@ -267,30 +272,11 @@ def test_normalize_parcel_history_populated_when_requested():
     assert len(parcel["history"]) == len(tracking_events_for_delivered())
 
 
-def test_normalize_parcel_raw_is_curated_not_verbatim():
+def test_normalize_parcel_raw_is_the_full_payload():
     raw = tracking_shipment(access_point=tracking_access_point())
     parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)
-    assert "addresses" not in parcel["raw"]
-    assert "accessPoint" not in parcel["raw"]
-    assert parcel["raw"]["phase"] == raw["phase"]
-
-
-def test_normalize_parcel_raw_keeps_the_state_fields():
-    """The payload's own state bits belong under raw, the draw hints do not."""
-    raw = tracking_shipment()
-    parcel = normalize_parcel(raw, tracking_code=TRACKING_CODE)["raw"]
-    for key in (
-        "externalShipmentId",
-        "pinGenerated",
-        "eveningDelivery",
-        "deliveryChangeAllowed",
-        "shipmentRefuseAllowed",
-        "podReportVisible",
-        "ePopReportVisible",
-    ):
-        assert key in parcel, key
-    for key in ("showDeliveryDate", "showParcelShop", "editMode"):
-        assert key not in parcel, key
+    assert parcel["raw"] == raw
+    assert parcel["raw"] is not raw
 
 
 def test_normalize_parcel_sender_from_the_live_integer_address_type():
@@ -323,7 +309,8 @@ def test_map_status_falls_back_to_the_base_code_before_the_dot(caplog):
 
 
 def test_an_explicit_full_code_still_beats_its_base_code():
-    assert map_parcel_status("Delivered.BackToSender") is ParcelStatus.DELIVERED
+    # base "Delivered" would map DELIVERED; the full code must win
+    assert map_parcel_status("Delivered.BackToSender") is ParcelStatus.RETURNING
     assert map_parcel_status("BackToSender") is ParcelStatus.RETURNING
 
 

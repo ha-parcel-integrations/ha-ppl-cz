@@ -39,6 +39,9 @@ TO_REDACT = {
     "url",
     # PPL CZ account-source payload fields
     "number",
+    "id",
+    "recipient",
+    "phone",
     "toAddress",
     "toDeliveryPoint",
     "street",
@@ -49,6 +52,10 @@ TO_REDACT = {
     "name",
     # PPL CZ tracking-source payload fields
     "shipmentId",
+    "externalShipmentId",
+    "parcelConectNumber",
+    "lastEventText",
+    "eventText",
     "addresses",
     "customerReference",
     "accessPoint",

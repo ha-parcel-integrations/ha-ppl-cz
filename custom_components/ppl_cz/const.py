@@ -117,11 +117,6 @@ SHIPMENT_DELIVERY_INFO_URL = (
 
 # Every /mobapp call also carries this static, shared key — identical across
 # every install of the mojePPL app, not a per-user or per-device credential.
-# Shipping an extracted shared secret is normally refused by this suite's
-# standing ruling (the reason bpost and the three UK carriers were passed on);
-# the maintainer reviewed this one specifically and ruled it an accepted risk
-# for PPL CZ (2026-08-22). Do not treat this as a precedent for a future
-# carrier — get a fresh ruling each time.
 DHL_API_KEY_HEADER = "dhl-api-key"
 DHL_API_KEY = "G83gXcEfTws2hTUbWEreWFor5SdOj5QR"
 
@@ -173,15 +168,10 @@ DEFAULT_DIRECTION = DIRECTION_INCOMING
 TRACKING_API_URL = "https://api.dhl.com/ecs/ppl/webapi/TrackAndTrace/{tracking_code}"
 TRACKING_NOT_FOUND_DETAIL = "service.TrackAndTrace.ShipmentNotFound"
 
-# This key is a *second* extracted shared secret, distinct from DHL_API_KEY
-# above — a public web bundle, not the mobile app, so its rotation risk
-# differs (no app release to signal a redeploy). Transport compatibility
-# material, never a user credential: do not expose it in UI, diagnostics or
-# log messages. A rejected key is a compatibility failure needing a new
-# release, never a user-facing reauth — this route has no credential at all,
-# so nothing can expire. Its own accepted-risk ruling, separate from
-# DHL_API_KEY's (maintainer, 2026-09-23) — do not treat either as a
-# precedent for a future carrier.
+# Sent on the website tracking route, separate from DHL_API_KEY above. Not a
+# user credential: keep it out of UI, diagnostics and log messages. A rejected
+# key is a compatibility failure needing a new release, never a user-facing
+# reauth — this route has no account, so nothing can expire.
 TRACKING_DHL_API_KEY = "7HH634Q79Zpge4xEGeFAHXAnUMRxv0XQ"
 
 # --- Config entry data --------------------------------------------------------

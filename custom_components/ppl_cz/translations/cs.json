@@ -132,6 +132,10 @@
         "name": "Příchozí zásilky",
         "unit_of_measurement": "zásilky"
       },
+      "en_route_to_pickup_point": {
+        "name": "Na cestě na výdejní místo",
+        "unit_of_measurement": "zásilky"
+      },
       "awaiting_pickup": {
         "name": "Připraveno k vyzvednutí",
         "unit_of_measurement": "zásilky"

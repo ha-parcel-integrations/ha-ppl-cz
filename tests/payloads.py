@@ -159,8 +159,7 @@ def events_for_delivered(code: str = INCOMING_CODE) -> list[dict]:
 #
 # Every field here is synthetic — no real tracking code, sender/recipient
 # name, address or access-point identifier from any live probe ever appears
-# in this repo. Shapes mirror api/tracking.md's "Payload — website surface"
-# section (structure only, no captured values).
+# in this repo. Only the payload structure is mirrored.
 
 TRACKING_CODE = "10000000009"
 
@@ -224,8 +223,7 @@ def tracking_shipment(
         "shipmentRefuseAllowed": False,
         "podReportVisible": True,
         "ePopReportVisible": False,
-        # Presentational only — kept in the fixture so the curated-raw test
-        # proves they are filtered out, not merely absent.
+        # Presentational flags, still part of the payload and so of `raw`.
         "showDeliveryDate": False,
         "showParcelShop": False,
         "editMode": None,

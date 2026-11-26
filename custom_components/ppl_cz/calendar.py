@@ -93,7 +93,13 @@ class PPLCZDeliveriesCalendar(
                 event_start, event_end = days
 
             barcode = parcel.get("barcode") or ""
-            summary = f"Parcel {barcode}" if barcode else "PPL CZ parcel"
+            # Contents say what is arriving; the sender is the fallback when the
+            # parcel has none.
+            summary = (
+                parcel.get("contents")
+                or parcel.get("sender")
+                or (f"Parcel {barcode}" if barcode else "PPL CZ parcel")
+            )
             description_parts = [
                 f"Barcode: {barcode}" if barcode else None,
                 f"Status: {parcel.get('status')}" if parcel.get("status") else None,

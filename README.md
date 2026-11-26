@@ -25,6 +25,7 @@ A custom Home Assistant integration for [PPL CZ](https://www.ppl.cz), one of Cze
 - [Dynamic polling](#dynamic-polling)
 - [Removal](#removal)
 - [Sensors](#sensors)
+- [Actions](#actions)
 - [Parcel status reference](#parcel-status-reference)
 - [Events](#events)
 - [Examples](#examples)
@@ -46,6 +47,7 @@ A custom Home Assistant integration for [PPL CZ](https://www.ppl.cz), one of Cze
 - A **deliveries calendar** on the tracking-code source, where a real expected delivery date is available
 - Events + device triggers for no-code automations (parcel registered / status changed / delivered, incoming and outgoing)
 - Opt-in per-parcel status history
+- Optional contents text per parcel, set with `ppl_cz.update_contents`
 - Manual refresh button and a diagnostic last-update sensor
 
 ## Requirements
@@ -167,6 +169,14 @@ A **`button.ppl_cz_<hub>_refresh`** entity triggers an immediate poll outside
 the regular interval.
 
 The tracking-code hub also gets a **`calendar.ppl_cz_tracking_codes_deliveries`** entity — one event per active parcel with a known expected delivery date. PPL CZ gives a day, so the event covers the whole day. The account source has no calendar entity: PPL's account API carries no delivery-date field at all.
+
+## Actions
+
+| Action | Fields | Description |
+|---|---|---|
+| `ppl_cz.update_contents` | `tracking_code`, `contents`, `config_entry_id` (optional) | Set what is in a parcel; an empty `contents` clears it. It goes to every entry that lists the code; name one with `config_entry_id` (needed for a code none lists yet). |
+
+The `contents` text you set titles the parcel's calendar event on the tracking-code hub and shows in each parcel's `contents` attribute.
 
 ## Parcel status reference
 

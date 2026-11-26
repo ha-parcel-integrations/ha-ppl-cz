@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import logging
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -18,10 +18,13 @@ from .const import (
     CONF_ACCESS_TOKEN,
     CONF_SOURCE,
     CONF_TOKEN_EXPIRES_AT,
+    DOMAIN,
     PLATFORMS,
     SOURCE_ACCOUNT,
     SOURCE_TRACKING,
 )
+from .contents import ContentsStore
+from .services import async_setup_services, async_unload_services
 from .session import async_create_ppl_session
 from .tracking.api import PPLCZTrackingApiClient
 from .tracking.coordinator import PPLCZTrackingCoordinator
@@ -93,6 +96,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> boo
         )
         coordinator = PPLCZCoordinator(hass, client, entry)
 
+    await coordinator.contents_store.async_load()
+
     # First refresh here, before forwarding to platforms: a failing fetch
     # fails the whole entry cleanly (ConfigEntryNotReady -> backoff), and an
     # expired account session raises ConfigEntryAuthFailed -> reauth. Doing
@@ -102,6 +107,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> boo
     entry.runtime_data = PPLCZData(client=client, coordinator=coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS[source])
+
+    async_setup_services(hass)
 
     if source == SOURCE_TRACKING:
         # Apply option changes (added/removed barcodes, delivered/history
@@ -125,4 +132,17 @@ async def _async_options_updated(hass: HomeAssistant, entry: PPLCZConfigEntry) -
 async def async_unload_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> bool:
     """Unload a PPL CZ config entry."""
     source = entry.data.get(CONF_SOURCE, SOURCE_ACCOUNT)
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS[source])
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS[source]):
+        return False
+    # The service stays while any other entry is still loaded.
+    if not any(
+        other.entry_id != entry.entry_id and other.state is ConfigEntryState.LOADED
+        for other in hass.config_entries.async_entries(DOMAIN)
+    ):
+        async_unload_services(hass)
+    return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: PPLCZConfigEntry) -> None:
+    """Delete the contents the user set for the removed entry."""
+    await ContentsStore(hass, entry.entry_id).async_remove()

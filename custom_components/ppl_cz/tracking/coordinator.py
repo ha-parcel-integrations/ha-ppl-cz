@@ -20,7 +20,7 @@ import logging
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -40,6 +40,7 @@ from ..const import (
     STAGGER_MINUTES,
     ParcelStatus,
 )
+from ..contents import ContentsStore, normalize_code
 from .api import PPLCZTrackingApiClient, PPLCZTrackingApiError, PPLCZTrackingNotFound
 from .parcels import (
     apply_delivered_filter,
@@ -140,6 +141,8 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
             update_interval=timedelta(minutes=HOT_INTERVAL_MINUTES),
         )
         self._client = client
+        self.contents_store = ContentsStore(hass, entry.entry_id)
+        self._known_codes: set[str] = set()
         self.delivered: list[dict] = []
         self.outgoing: list[dict] = []
         self.delivered_outgoing: list[dict] = []
@@ -156,6 +159,32 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
         self._known_outgoing_state: dict[str, ParcelStatus] | None = None
         self._cached_device_id: str | None = None
         self.last_success_time: datetime | None = None
+
+    @property
+    def known_codes(self) -> set[str]:
+        """Normalised codes of every parcel the last poll listed, both directions."""
+        return self._known_codes
+
+    def _apply_contents(self, parcel: dict) -> dict:
+        """Put the user's own contents text over the carrier's, when there is one."""
+        barcode = parcel.get("barcode")
+        user_value = self.contents_store.get(barcode) if barcode else None
+        if user_value is not None:
+            parcel["contents"] = user_value
+        return parcel
+
+    @callback
+    def async_reapply_contents(self) -> None:
+        """Show a changed contents value without polling the carrier again."""
+        for parcel in [
+            *(self.data or []),
+            *self.delivered,
+            *self.outgoing,
+            *self.delivered_outgoing,
+        ]:
+            parcel["contents"] = None
+            self._apply_contents(parcel)
+        self.async_update_listeners()
 
     @property
     def current_tier_minutes(self) -> int | None:
@@ -268,14 +297,17 @@ class PPLCZTrackingCoordinator(DataUpdateCoordinator[list[dict]]):
         entries = [
             (
                 code,
-                normalize_parcel(
-                    raws.get(code, {}),
-                    tracking_code=code,
-                    include_history=include_history,
+                self._apply_contents(
+                    normalize_parcel(
+                        raws.get(code, {}),
+                        tracking_code=code,
+                        include_history=include_history,
+                    )
                 ),
             )
             for code in tracked
         ]
+        self._known_codes = {normalize_code(code) for code in tracked}
         self._delivered_codes = {
             code for code, parcel in entries if parcel["delivered"]
         }

@@ -1,0 +1,17 @@
+update_contents:
+  fields:
+    tracking_code:
+      required: true
+      example: "PPL-TEST-0001"
+      selector:
+        text:
+    contents:
+      required: false
+      example: "Running shoes"
+      selector:
+        text:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ppl_cz

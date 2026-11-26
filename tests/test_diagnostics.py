@@ -24,6 +24,7 @@ async def test_diagnostics_redacts_and_counts(hass):
         "status": "in_transit",
         "sender": "Example Shop",
         "pickup_point": "AlzaBox Central",
+        "contents": "Running shoes",
         "url": "https://www.ppl.cz/vyhledat-zasilku?shipmentId=10000000001",
         "raw": {
             "ownership": "OWNER",
@@ -52,6 +53,7 @@ async def test_diagnostics_redacts_and_counts(hass):
     assert incoming["sender"] == "**REDACTED**"
     assert incoming["pickup_point"] == "**REDACTED**"
     assert incoming["url"] == "**REDACTED**"
+    assert incoming["contents"] == "**REDACTED**"
     assert incoming["raw"]["cod"] == "**REDACTED**"
     # non-identifying fields survive
     assert incoming["status"] == "in_transit"
@@ -68,6 +70,7 @@ async def test_diagnostics_redacts_tracking_source_fields(hass):
         "status": "in_transit",
         "sender": "Example Sender",
         "pickup_point": "Example Pickup Point",
+        "contents": "Running shoes",
         "url": "https://www.ppl.cz/vyhledat-zasilku?shipmentId=10000000009",
         "raw": {
             "phase": "ShipmentInTransport",
@@ -92,6 +95,7 @@ async def test_diagnostics_redacts_tracking_source_fields(hass):
     assert incoming["sender"] == "**REDACTED**"
     assert incoming["pickup_point"] == "**REDACTED**"
     assert incoming["url"] == "**REDACTED**"
+    assert incoming["contents"] == "**REDACTED**"
     assert incoming["status"] == "in_transit"
     for key in (
         "externalShipmentId",
